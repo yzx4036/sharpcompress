@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using Microsoft.Extensions.PlatformAbstractions;
-using SharpCompress.Common;
 using SharpCompress.Readers;
 using Xunit;
 
@@ -237,8 +235,14 @@ namespace SharpCompress.Test
         public TestBase()
         {
             Monitor.Enter(lockObject);
-            var index = PlatformServices.Default.Application.ApplicationBasePath.IndexOf("SharpCompress.Test", StringComparison.OrdinalIgnoreCase);
-            SOLUTION_BASE_PATH = Path.GetDirectoryName(PlatformServices.Default.Application.ApplicationBasePath.Substring(0, index));
+            
+#if NETSTANDARD20
+            var index = AppDomain.CurrentDomain.BaseDirectory.IndexOf("SharpCompress.Test", StringComparison.OrdinalIgnoreCase);
+            SOLUTION_BASE_PATH = Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory.Substring(0, index));
+    #else
+            var index = Microsoft.Extensions.PlatformAbstractions.PlatformServices.Default.Application.ApplicationBasePath.IndexOf("SharpCompress.Test", StringComparison.OrdinalIgnoreCase);
+            SOLUTION_BASE_PATH = Path.GetDirectoryName(Microsoft.Extensions.PlatformAbstractions.PlatformServices.Default.Application.ApplicationBasePath.Substring(0, index));
+    #endif
             TEST_ARCHIVES_PATH = Path.Combine(SOLUTION_BASE_PATH, "TestArchives", "Archives");
             ORIGINAL_FILES_PATH = Path.Combine(SOLUTION_BASE_PATH, "TestArchives", "Original");
             MISC_TEST_FILES_PATH = Path.Combine(SOLUTION_BASE_PATH, "TestArchives", "MiscTest");
