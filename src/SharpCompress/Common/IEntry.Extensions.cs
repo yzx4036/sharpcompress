@@ -1,11 +1,8 @@
-﻿
-#if !NO_FILE
-using System.IO;
-using SharpCompress.Readers;
+﻿using System.IO;
 
 namespace SharpCompress.Common
 {
-    internal static class IEntryExtensions
+    internal static class EntryExtensions
     {
         internal static void PreserveExtractionOptions(this IEntry entry, string destinationFileName,
                                                         ExtractionOptions options)
@@ -48,4 +45,3 @@ namespace SharpCompress.Common
         }
     }
 }
-#endif

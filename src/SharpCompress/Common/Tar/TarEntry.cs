@@ -1,19 +1,20 @@
-﻿using System;
+﻿#nullable disable
+
+using System;
 using System.Collections.Generic;
 using System.IO;
 using SharpCompress.Common.Tar.Headers;
 using SharpCompress.IO;
-using System.Text;
 
 namespace SharpCompress.Common.Tar
 {
     public class TarEntry : Entry
     {
-        private readonly TarFilePart filePart;
+        private readonly TarFilePart _filePart;
 
         internal TarEntry(TarFilePart filePart, CompressionType type)
         {
-            this.filePart = filePart;
+            this._filePart = filePart;
             CompressionType = type;
         }
 
@@ -21,13 +22,15 @@ namespace SharpCompress.Common.Tar
 
         public override long Crc => 0;
 
-        public override string Key => filePart.Header.Name;
+        public override string Key => _filePart.Header.Name;
 
-        public override long CompressedSize => filePart.Header.Size;
+        public override string LinkTarget => _filePart.Header.LinkName;
 
-        public override long Size => filePart.Header.Size;
+        public override long CompressedSize => _filePart.Header.Size;
 
-        public override DateTime? LastModifiedTime => filePart.Header.LastModifiedTime;
+        public override long Size => _filePart.Header.Size;
+
+        public override DateTime? LastModifiedTime => _filePart.Header.LastModifiedTime;
 
         public override DateTime? CreatedTime => null;
 
@@ -37,11 +40,11 @@ namespace SharpCompress.Common.Tar
 
         public override bool IsEncrypted => false;
 
-        public override bool IsDirectory => filePart.Header.EntryType == EntryType.Directory;
+        public override bool IsDirectory => _filePart.Header.EntryType == EntryType.Directory;
 
-        public override bool IsSplit => false;
+        public override bool IsSplitAfter => false;
 
-        internal override IEnumerable<FilePart> Parts => filePart.AsEnumerable<FilePart>();
+        internal override IEnumerable<FilePart> Parts => _filePart.AsEnumerable<FilePart>();
 
         internal static IEnumerable<TarEntry> GetEntries(StreamingMode mode, Stream stream,
                                                          CompressionType compressionType, ArchiveEncoding archiveEncoding)

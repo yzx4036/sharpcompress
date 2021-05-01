@@ -1,20 +1,27 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 
 namespace SharpCompress.IO
 {
-    internal class NonDisposingStream : Stream
+    public class NonDisposingStream : Stream
     {
-        public NonDisposingStream(Stream stream)
+        public NonDisposingStream(Stream stream, bool throwOnDispose = false)
         {
             Stream = stream;
+            ThrowOnDispose = throwOnDispose;
         }
+
+        public bool ThrowOnDispose { get; set; }
 
         protected override void Dispose(bool disposing)
         {
-            //don't dispose anything
+            if (ThrowOnDispose)
+            {
+                throw new InvalidOperationException($"Attempt to dispose of a {nameof(NonDisposingStream)} when {nameof(ThrowOnDispose)} is {ThrowOnDispose}");
+            }
         }
 
-        public Stream Stream { get; }
+        protected Stream Stream { get; }
 
         public override bool CanRead => Stream.CanRead;
 
@@ -50,5 +57,19 @@ namespace SharpCompress.IO
         {
             Stream.Write(buffer, offset, count);
         }
+
+#if !NET461 && !NETSTANDARD2_0
+
+        public override int Read(Span<byte> buffer)
+        {
+            return Stream.Read(buffer);
+        }
+
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            Stream.Write(buffer);
+        }
+
+#endif
     }
 }

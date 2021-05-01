@@ -10,7 +10,7 @@ namespace SharpCompress.Readers.Zip
     {
         private readonly StreamingZipHeaderFactory _headerFactory;
 
-        internal ZipReader(Stream stream, ReaderOptions options)
+        private ZipReader(Stream stream, ReaderOptions options)
             : base(options, ArchiveType.Zip)
         {
             Volume = new ZipVolume(stream, options);
@@ -27,15 +27,15 @@ namespace SharpCompress.Readers.Zip
         /// <param name="stream"></param>
         /// <param name="options"></param>
         /// <returns></returns>
-        public static ZipReader Open(Stream stream, ReaderOptions options = null)
+        public static ZipReader Open(Stream stream, ReaderOptions? options = null)
         {
-            stream.CheckNotNull("stream");
+            stream.CheckNotNull(nameof(stream));
             return new ZipReader(stream, options ?? new ReaderOptions());
         }
 
         #endregion Open
 
-        internal override IEnumerable<ZipEntry> GetEntries(Stream stream)
+        protected override IEnumerable<ZipEntry> GetEntries(Stream stream)
         {
             foreach (ZipHeader h in _headerFactory.ReadStreamHeader(stream))
             {
@@ -45,8 +45,7 @@ namespace SharpCompress.Readers.Zip
                     {
                         case ZipHeaderType.LocalEntry:
                             {
-                                yield return new ZipEntry(new StreamingZipFilePart(h as LocalEntryHeader,
-                                                                                   stream));
+                                yield return new ZipEntry(new StreamingZipFilePart((LocalEntryHeader)h, stream));
                             }
                             break;
                         case ZipHeaderType.DirectoryEnd:

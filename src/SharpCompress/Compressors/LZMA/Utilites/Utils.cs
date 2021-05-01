@@ -18,7 +18,7 @@ namespace SharpCompress.Compressors.LZMA.Utilites
         UnpackInfo = 7,
         SubStreamsInfo = 8,
         Size = 9,
-        CRC = 10,
+        Crc = 10,
         Folder = 11,
         CodersUnpackSize = 12,
         NumUnpackStream = 13,
@@ -56,12 +56,12 @@ namespace SharpCompress.Compressors.LZMA.Utilites
 
         public static void ReadExact(this Stream stream, byte[] buffer, int offset, int length)
         {
-            if (stream == null)
+            if (stream is null)
             {
                 throw new ArgumentNullException(nameof(stream));
             }
 
-            if (buffer == null)
+            if (buffer is null)
             {
                 throw new ArgumentNullException(nameof(buffer));
             }

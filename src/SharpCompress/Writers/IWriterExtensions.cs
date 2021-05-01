@@ -1,7 +1,7 @@
-﻿#if !NO_FILE
-using System;
-#endif
+﻿using System;
 using System.IO;
+using System.Linq;
+using System.Linq.Expressions;
 
 namespace SharpCompress.Writers
 {
@@ -12,7 +12,6 @@ namespace SharpCompress.Writers
             writer.Write(entryPath, source, null);
         }
 
-#if !NO_FILE
         public static void Write(this IWriter writer, string entryPath, FileInfo source)
         {
             if (!source.Exists)
@@ -30,22 +29,30 @@ namespace SharpCompress.Writers
             writer.Write(entryPath, new FileInfo(source));
         }
 
-        public static void WriteAll(this IWriter writer, string directory, string searchPattern = "*",
+        public static void WriteAll(this IWriter writer, string directory, string searchPattern = "*", SearchOption option = SearchOption.TopDirectoryOnly)
+        {
+            writer.WriteAll(directory, searchPattern, null, option);
+        }
+
+        public static void WriteAll(this IWriter writer,
+                                    string directory,
+                                    string searchPattern = "*",
+                                    Expression<Func<string, bool>>? fileSearchFunc = null,
                                     SearchOption option = SearchOption.TopDirectoryOnly)
         {
             if (!Directory.Exists(directory))
             {
                 throw new ArgumentException("Directory does not exist: " + directory);
             }
-#if NET35
-            foreach (var file in Directory.GetDirectories(directory, searchPattern, option))
-#else
-            foreach (var file in Directory.EnumerateFiles(directory, searchPattern, option))
-#endif
+
+            if (fileSearchFunc is null)
+            {
+                fileSearchFunc = n => true;
+            }
+            foreach (var file in Directory.EnumerateFiles(directory, searchPattern, option).Where(fileSearchFunc.Compile()))
             {
                 writer.Write(file.Substring(directory.Length), file);
             }
         }
-#endif
     }
 }

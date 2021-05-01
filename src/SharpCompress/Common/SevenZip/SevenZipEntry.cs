@@ -18,6 +18,8 @@ namespace SharpCompress.Common.SevenZip
 
         public override string Key => FilePart.Header.Name;
 
+        public override string? LinkTarget => null;
+
         public override long CompressedSize => 0;
 
         public override long Size => FilePart.Header.Size;
@@ -30,13 +32,13 @@ namespace SharpCompress.Common.SevenZip
 
         public override DateTime? ArchivedTime => null;
 
-        public override bool IsEncrypted => false;
+        public override bool IsEncrypted => FilePart.IsEncrypted;
 
         public override bool IsDirectory => FilePart.Header.IsDir;
 
-        public override bool IsSplit => false;
+        public override bool IsSplitAfter => false;
 
-        public override int? Attrib => (int)FilePart.Header.Attrib;
+        public override int? Attrib => FilePart.Header.Attrib.HasValue ? (int?)FilePart.Header.Attrib.Value : null;
 
         internal override IEnumerable<FilePart> Parts => FilePart.AsEnumerable<FilePart>();
     }

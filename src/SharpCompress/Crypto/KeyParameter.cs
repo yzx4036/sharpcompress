@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Org.BouncyCastle.Crypto.Parameters
+namespace SharpCompress.Crypto
 {
     public class KeyParameter
         : ICipherParameters
@@ -10,7 +10,7 @@ namespace Org.BouncyCastle.Crypto.Parameters
         public KeyParameter(
             byte[] key)
         {
-            if (key == null)
+            if (key is null)
             {
                 throw new ArgumentNullException(nameof(key));
             }
@@ -23,7 +23,7 @@ namespace Org.BouncyCastle.Crypto.Parameters
             int keyOff,
             int keyLen)
         {
-            if (key == null)
+            if (key is null)
             {
                 throw new ArgumentNullException(nameof(key));
             }

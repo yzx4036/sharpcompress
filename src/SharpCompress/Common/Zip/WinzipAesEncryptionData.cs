@@ -1,8 +1,8 @@
+#nullable disable
 
-#if !NO_CRYPTO
 using System;
+using System.Buffers.Binary;
 using System.Security.Cryptography;
-using SharpCompress.Converters;
 
 namespace SharpCompress.Common.Zip
 {
@@ -10,64 +10,58 @@ namespace SharpCompress.Common.Zip
     {
         private const int RFC2898_ITERATIONS = 1000;
 
-        private byte[] salt;
-        private WinzipAesKeySize keySize;
-        private byte[] passwordVerifyValue;
-        private string password;
+        private readonly byte[] _salt;
+        private readonly WinzipAesKeySize _keySize;
+        private readonly byte[] _passwordVerifyValue;
+        private readonly string _password;
 
-        private byte[] generatedVerifyValue;
+        private byte[] _generatedVerifyValue;
 
         internal WinzipAesEncryptionData(WinzipAesKeySize keySize, byte[] salt, byte[] passwordVerifyValue,
                                          string password)
         {
-            this.keySize = keySize;
-            this.salt = salt;
-            this.passwordVerifyValue = passwordVerifyValue;
-            this.password = password;
+            this._keySize = keySize;
+            this._salt = salt;
+            this._passwordVerifyValue = passwordVerifyValue;
+            this._password = password;
             Initialize();
         }
 
-        internal byte[] IvBytes
-{
-    get; set;
-}
-        internal byte[] KeyBytes
-{
-    get; set;
-}
+        internal byte[] IvBytes { get; set; }
+
+        internal byte[] KeyBytes { get; set; }
 
         private int KeySizeInBytes
         {
-            get { return KeyLengthInBytes(keySize);
-}
+            get
+            {
+                return KeyLengthInBytes(_keySize);
+            }
         }
 
         internal static int KeyLengthInBytes(WinzipAesKeySize keySize)
         {
-            switch (keySize)
+            return keySize switch
             {
-                case WinzipAesKeySize.KeySize128:
-                    return 16;
-                case WinzipAesKeySize.KeySize192:
-                    return 24;
-                case WinzipAesKeySize.KeySize256:
-                    return 32;
-            }
-            throw new InvalidOperationException();
+                WinzipAesKeySize.KeySize128 => 16,
+                WinzipAesKeySize.KeySize192 => 24,
+                WinzipAesKeySize.KeySize256 => 32,
+                _ => throw new InvalidOperationException(),
+            };
         }
 
         private void Initialize()
         {
-            var rfc2898 = new Rfc2898DeriveBytes(password, salt, RFC2898_ITERATIONS);
+            var rfc2898 = new Rfc2898DeriveBytes(_password, _salt, RFC2898_ITERATIONS);
 
             KeyBytes = rfc2898.GetBytes(KeySizeInBytes); // 16 or 24 or 32 ???
             IvBytes = rfc2898.GetBytes(KeySizeInBytes);
-            generatedVerifyValue = rfc2898.GetBytes(2);
+            _generatedVerifyValue = rfc2898.GetBytes(2);
 
-            short verify = DataConverter.LittleEndian.GetInt16(passwordVerifyValue, 0);
-            if (password != null)
+            short verify = BinaryPrimitives.ReadInt16LittleEndian(_passwordVerifyValue);
+            if (_password != null)
             {
-                short generated = DataConverter.LittleEndian.GetInt16(generatedVerifyValue, 0);
+                short generated = BinaryPrimitives.ReadInt16LittleEndian(_generatedVerifyValue);
                 if (verify != generated)
                 {
                     throw new InvalidFormatException("bad password");
@@ -76,4 +70,3 @@ namespace SharpCompress.Common.Zip
         }
     }
 }
-#endif

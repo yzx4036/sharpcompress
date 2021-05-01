@@ -6,12 +6,11 @@ using SharpCompress.Archives.SevenZip;
 using SharpCompress.Archives.Tar;
 using SharpCompress.Archives.Zip;
 using SharpCompress.Common;
-using SharpCompress.Compressors.LZMA;
 using SharpCompress.Readers;
 
 namespace SharpCompress.Archives
 {
-    public class ArchiveFactory
+    public static class ArchiveFactory
     {
         /// <summary>
         /// Opens an Archive for random access
@@ -19,14 +18,14 @@ namespace SharpCompress.Archives
         /// <param name="stream"></param>
         /// <param name="readerOptions"></param>
         /// <returns></returns>
-        public static IArchive Open(Stream stream, ReaderOptions readerOptions = null)
+        public static IArchive Open(Stream stream, ReaderOptions? readerOptions = null)
         {
-            stream.CheckNotNull("stream");
+            stream.CheckNotNull(nameof(stream));
             if (!stream.CanRead || !stream.CanSeek)
             {
                 throw new ArgumentException("Stream should be readable and seekable");
             }
-            readerOptions = readerOptions ?? new ReaderOptions();
+            readerOptions ??= new ReaderOptions();
             if (ZipArchive.IsZipFile(stream, null))
             {
                 stream.Seek(0, SeekOrigin.Begin);
@@ -61,38 +60,24 @@ namespace SharpCompress.Archives
 
         public static IWritableArchive Create(ArchiveType type)
         {
-            switch (type)
+            return type switch
             {
-                case ArchiveType.Zip:
-                {
-                    return ZipArchive.Create();
-                }
-                case ArchiveType.Tar:
-                {
-                    return TarArchive.Create();
-                }
-                case ArchiveType.GZip:
-                {
-                    return GZipArchive.Create();
-                }
-                default:
-                {
-                    throw new NotSupportedException("Cannot create Archives of type: " + type);
-                }
-            }
+                ArchiveType.Zip => ZipArchive.Create(),
+                ArchiveType.Tar => TarArchive.Create(),
+                ArchiveType.GZip => GZipArchive.Create(),
+                _ => throw new NotSupportedException("Cannot create Archives of type: " + type)
+            };
         }
-
-#if !NO_FILE
 
         /// <summary>
         /// Constructor expects a filepath to an existing file.
         /// </summary>
         /// <param name="filePath"></param>
         /// <param name="options"></param>
-        public static IArchive Open(string filePath, ReaderOptions options = null)
+        public static IArchive Open(string filePath, ReaderOptions? options = null)
         {
-            filePath.CheckNotNullOrEmpty("filePath");
-            return Open(new FileInfo(filePath), options ?? new ReaderOptions());
+            filePath.CheckNotNullOrEmpty(nameof(filePath));
+            return Open(new FileInfo(filePath), options);
         }
 
         /// <summary>
@@ -100,59 +85,50 @@ namespace SharpCompress.Archives
         /// </summary>
         /// <param name="fileInfo"></param>
         /// <param name="options"></param>
-        public static IArchive Open(FileInfo fileInfo, ReaderOptions options = null)
+        public static IArchive Open(FileInfo fileInfo, ReaderOptions? options = null)
         {
-            fileInfo.CheckNotNull("fileInfo");
-            options = options ?? new ReaderOptions();
-            using (var stream = fileInfo.OpenRead())
+            fileInfo.CheckNotNull(nameof(fileInfo));
+            options ??= new ReaderOptions { LeaveStreamOpen = false };
+
+            using var stream = fileInfo.OpenRead();
+            if (ZipArchive.IsZipFile(stream, null))
             {
-                if (ZipArchive.IsZipFile(stream, null))
-                {
-                    stream.Dispose();
-                    return ZipArchive.Open(fileInfo, options);
-                }
-                stream.Seek(0, SeekOrigin.Begin);
-                if (SevenZipArchive.IsSevenZipFile(stream))
-                {
-                    stream.Dispose();
-                    return SevenZipArchive.Open(fileInfo, options);
-                }
-                stream.Seek(0, SeekOrigin.Begin);
-                if (GZipArchive.IsGZipFile(stream))
-                {
-                    stream.Dispose();
-                    return GZipArchive.Open(fileInfo, options);
-                }
-                stream.Seek(0, SeekOrigin.Begin);
-                if (RarArchive.IsRarFile(stream, options))
-                {
-                   stream.Dispose();
-                   return RarArchive.Open(fileInfo, options);
-                }
-                stream.Seek(0, SeekOrigin.Begin);
-                if (TarArchive.IsTarFile(stream))
-                {
-                    stream.Dispose();
-                    return TarArchive.Open(fileInfo, options);
-                }
-                throw new InvalidOperationException("Cannot determine compressed stream type. Supported Archive Formats: Zip, GZip, Tar, Rar, 7Zip");
+                return ZipArchive.Open(fileInfo, options);
             }
+            stream.Seek(0, SeekOrigin.Begin);
+            if (SevenZipArchive.IsSevenZipFile(stream))
+            {
+                return SevenZipArchive.Open(fileInfo, options);
+            }
+            stream.Seek(0, SeekOrigin.Begin);
+            if (GZipArchive.IsGZipFile(stream))
+            {
+                return GZipArchive.Open(fileInfo, options);
+            }
+            stream.Seek(0, SeekOrigin.Begin);
+            if (RarArchive.IsRarFile(stream, options))
+            {
+                return RarArchive.Open(fileInfo, options);
+            }
+            stream.Seek(0, SeekOrigin.Begin);
+            if (TarArchive.IsTarFile(stream))
+            {
+                return TarArchive.Open(fileInfo, options);
+            }
+            throw new InvalidOperationException("Cannot determine compressed stream type. Supported Archive Formats: Zip, GZip, Tar, Rar, 7Zip");
         }
 
         /// <summary>
         /// Extract to specific directory, retaining filename
         /// </summary>
         public static void WriteToDirectory(string sourceArchive, string destinationDirectory,
-                                            ExtractionOptions options = null)
+                                            ExtractionOptions? options = null)
         {
-            using (IArchive archive = Open(sourceArchive))
+            using IArchive archive = Open(sourceArchive);
+            foreach (IArchiveEntry entry in archive.Entries)
             {
-                foreach (IArchiveEntry entry in archive.Entries)
-                {
-                    entry.WriteToDirectory(destinationDirectory, options);
-                }
+                entry.WriteToDirectory(destinationDirectory, options);
             }
         }
-#endif
     }
 }

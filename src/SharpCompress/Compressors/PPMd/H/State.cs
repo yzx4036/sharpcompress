@@ -1,15 +1,15 @@
 using System;
+using System.Buffers.Binary;
 using System.Text;
-using SharpCompress.Converters;
 
 namespace SharpCompress.Compressors.PPMd.H
 {
-    internal class State : Pointer
+    internal sealed class State : Pointer
     {
-        internal const int Size = 6;
+        internal const int SIZE = 6;
 
-        internal State(byte[] Memory)
-            : base(Memory)
+        internal State(byte[]? memory)
+            : base(memory)
         {
         }
 
@@ -29,17 +29,17 @@ namespace SharpCompress.Compressors.PPMd.H
 
         internal int GetSuccessor()
         {
-            return DataConverter.LittleEndian.GetInt32(Memory, Address + 2);
+            return BinaryPrimitives.ReadInt32LittleEndian(Memory.AsSpan(Address + 2));
         }
 
-        internal void SetSuccessor(PPMContext successor)
+        internal void SetSuccessor(PpmContext successor)
         {
             SetSuccessor(successor.Address);
         }
 
         internal void SetSuccessor(int successor)
         {
-            DataConverter.LittleEndian.PutBytes(Memory, Address + 2, successor);
+            BinaryPrimitives.WriteInt32LittleEndian(Memory.AsSpan(Address + 2), successor);
         }
 
         internal void SetValues(StateRef state)
@@ -51,25 +51,25 @@ namespace SharpCompress.Compressors.PPMd.H
 
         internal void SetValues(State ptr)
         {
-            Array.Copy(ptr.Memory, ptr.Address, Memory, Address, Size);
+            Array.Copy(ptr.Memory, ptr.Address, Memory, Address, SIZE);
         }
 
         internal State DecrementAddress()
         {
-            Address = Address - Size;
+            Address = Address - SIZE;
             return this;
         }
 
         internal State IncrementAddress()
         {
-            Address = Address + Size;
+            Address = Address + SIZE;
             return this;
         }
 
-        internal static void PPMDSwap(State ptr1, State ptr2)
+        internal static void PpmdSwap(State ptr1, State ptr2)
         {
             byte[] mem1 = ptr1.Memory, mem2 = ptr2.Memory;
-            for (int i = 0, pos1 = ptr1.Address, pos2 = ptr2.Address; i < Size; i++, pos1++, pos2++)
+            for (int i = 0, pos1 = ptr1.Address, pos2 = ptr2.Address; i < SIZE; i++, pos1++, pos2++)
             {
                 byte temp = mem1[pos1];
                 mem1[pos1] = mem2[pos2];
@@ -84,7 +84,7 @@ namespace SharpCompress.Compressors.PPMd.H
             buffer.Append("\n  Address=");
             buffer.Append(Address);
             buffer.Append("\n  size=");
-            buffer.Append(Size);
+            buffer.Append(SIZE);
             buffer.Append("\n  symbol=");
             buffer.Append(Symbol);
             buffer.Append("\n  freq=");

@@ -1,23 +1,23 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using SharpCompress.Readers;
 
 namespace SharpCompress
 {
     internal static class Utility
-    {   
-        public static ReadOnlyCollection<T> ToReadOnly<T>(this IEnumerable<T> items)
+    {
+        public static ReadOnlyCollection<T> ToReadOnly<T>(this ICollection<T> items)
         {
-            return new ReadOnlyCollection<T>(items.ToList());
+            return new ReadOnlyCollection<T>(items);
         }
 
         /// <summary>
         /// Performs an unsigned bitwise right shift with the specified number
         /// </summary>
         /// <param name="number">Number to operate on</param>
-        /// <param name="bits">Ammount of bits to shift</param>
+        /// <param name="bits">Amount of bits to shift</param>
         /// <returns>The resulting number from the shift operation</returns>
         public static int URShift(int number, int bits)
         {
@@ -32,7 +32,7 @@ namespace SharpCompress
         /// Performs an unsigned bitwise right shift with the specified number
         /// </summary>
         /// <param name="number">Number to operate on</param>
-        /// <param name="bits">Ammount of bits to shift</param>
+        /// <param name="bits">Amount of bits to shift</param>
         /// <returns>The resulting number from the shift operation</returns>
         public static long URShift(long number, int bits)
         {
@@ -43,47 +43,12 @@ namespace SharpCompress
             return (number >> bits) + (2L << ~bits);
         }
 
-        /// <summary>
-        /// Fills the array with an specific value from an specific index to an specific index.
-        /// </summary>
-        /// <param name="array">The array to be filled.</param>
-        /// <param name="fromindex">The first index to be filled.</param>
-        /// <param name="toindex">The last index to be filled.</param>
-        /// <param name="val">The value to fill the array with.</param>
-        public static void Fill<T>(T[] array, int fromindex, int toindex, T val) where T : struct
-        {
-            if (array.Length == 0)
-            {
-                throw new NullReferenceException();
-            }
-            if (fromindex > toindex)
-            {
-                throw new ArgumentException();
-            }
-            if ((fromindex < 0) || array.Length < toindex)
-            {
-                throw new IndexOutOfRangeException();
-            }
-            for (int index = (fromindex > 0) ? fromindex-- : fromindex; index < toindex; index++)
-            {
-                array[index] = val;
-            }
-        }
-
-        /// <summary>
-        /// Fills the array with an specific value.
-        /// </summary>
-        /// <param name="array">The array to be filled.</param>
-        /// <param name="val">The value to fill the array with.</param>
-        public static void Fill<T>(T[] array, T val) where T : struct
-        {
-            Fill(array, 0, array.Length, val);
-        }
-
         public static void SetSize(this List<byte> list, int count)
         {
             if (count > list.Count)
             {
+                // Ensure the list only needs to grow once
+                list.Capacity = count;
                 for (int i = list.Count; i < count; i++)
                 {
                     list.Add(0x0);
@@ -91,18 +56,7 @@ namespace SharpCompress
             }
             else
             {
-                byte[] temp = new byte[count];
-                list.CopyTo(temp, 0);
-                list.Clear();
-                list.AddRange(temp);
-            }
-        }
-
-        public static void AddRange<T>(this ICollection<T> destination, IEnumerable<T> source)
-        {
-            foreach (T item in source)
-            {
-                destination.Add(item);
+                list.RemoveRange(count, list.Count - count);
             }
         }
 
@@ -114,6 +68,26 @@ namespace SharpCompress
             }
         }
 
+        public static void Copy(Array sourceArray, long sourceIndex, Array destinationArray, long destinationIndex, long length)
+        {
+            if (sourceIndex > Int32.MaxValue || sourceIndex < Int32.MinValue)
+            {
+                throw new ArgumentOutOfRangeException();
+            }
+
+            if (destinationIndex > Int32.MaxValue || destinationIndex < Int32.MinValue)
+            {
+                throw new ArgumentOutOfRangeException();
+            }
+
+            if (length > Int32.MaxValue || length < Int32.MinValue)
+            {
+                throw new ArgumentOutOfRangeException();
+            }
+
+            Array.Copy(sourceArray, (int)sourceIndex, destinationArray, (int)destinationIndex, (int)length);
+        }
+
         public static IEnumerable<T> AsEnumerable<T>(this T item)
         {
             yield return item;
@@ -121,7 +95,7 @@ namespace SharpCompress
 
         public static void CheckNotNull(this object obj, string name)
         {
-            if (obj == null)
+            if (obj is null)
             {
                 throw new ArgumentNullException(name);
             }
@@ -132,43 +106,63 @@ namespace SharpCompress
             obj.CheckNotNull(name);
             if (obj.Length == 0)
             {
-                throw new ArgumentException("String is empty.");
+                throw new ArgumentException("String is empty.", name);
             }
         }
 
         public static void Skip(this Stream source, long advanceAmount)
         {
-            byte[] buffer = GetTransferByteArray();
-            int read = 0;
-            int readCount = 0;
-            do
+            if (source.CanSeek)
             {
-                readCount = buffer.Length;
-                if (readCount > advanceAmount)
-                {
-                    readCount = (int)advanceAmount;
-                }
-                read = source.Read(buffer, 0, readCount);
-                if (read <= 0)
-                {
-                    break;
-                }
-                advanceAmount -= read;
-                if (advanceAmount == 0)
-                {
-                    break;
-                }
+                source.Position += advanceAmount;
+                return;
             }
-            while (true);
+
+            byte[] buffer = GetTransferByteArray();
+            try
+            {
+                int read = 0;
+                int readCount = 0;
+                do
+                {
+                    readCount = buffer.Length;
+                    if (readCount > advanceAmount)
+                    {
+                        readCount = (int)advanceAmount;
+                    }
+                    read = source.Read(buffer, 0, readCount);
+                    if (read <= 0)
+                    {
+                        break;
+                    }
+                    advanceAmount -= read;
+                    if (advanceAmount == 0)
+                    {
+                        break;
+                    }
+                }
+                while (true);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
         }
 
         public static void Skip(this Stream source)
         {
             byte[] buffer = GetTransferByteArray();
-            do
+            try
             {
+                do
+                {
+                }
+                while (source.Read(buffer, 0, buffer.Length) == buffer.Length);
             }
-            while (source.Read(buffer, 0, buffer.Length) == buffer.Length);
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
         }
 
         public static DateTime DosDateToDateTime(UInt16 iDate, UInt16 iTime)
@@ -206,7 +200,7 @@ namespace SharpCompress
 
         public static uint DateTimeToDosTime(this DateTime? dateTime)
         {
-            if (dateTime == null)
+            if (dateTime is null)
             {
                 return 0;
             }
@@ -225,38 +219,56 @@ namespace SharpCompress
                                      (UInt16)(iTime % 65536));
         }
 
-        public static DateTime DosDateToDateTime(Int32 iTime)
+        /// <summary>
+        /// Convert Unix time value to a DateTime object.
+        /// </summary>
+        /// <param name="unixtime">The Unix time stamp you want to convert to DateTime.</param>
+        /// <returns>Returns a DateTime object that represents value of the Unix time.</returns>
+        public static DateTime UnixTimeToDateTime(long unixtime)
         {
-            return DosDateToDateTime((UInt32)iTime);
+            DateTime sTime = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            return sTime.AddSeconds(unixtime);
         }
 
         public static long TransferTo(this Stream source, Stream destination)
         {
             byte[] array = GetTransferByteArray();
-            int count;
-            long total = 0;
-            while (ReadTransferBlock(source, array, out count))
+            try
             {
-                total += count;
-                destination.Write(array, 0, count);
+                long total = 0;
+                while (ReadTransferBlock(source, array, out int count))
+                {
+                    total += count;
+                    destination.Write(array, 0, count);
+                }
+                return total;
             }
-            return total;
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(array);
+            }
         }
 
         public static long TransferTo(this Stream source, Stream destination, Common.Entry entry, IReaderExtractionListener readerExtractionListener)
         {
             byte[] array = GetTransferByteArray();
-            int count;
-            var iterations = 0;
-            long total = 0;
-            while (ReadTransferBlock(source, array, out count))
+            try
             {
-                total += count;
-                destination.Write(array, 0, count);
-                iterations++;
-                readerExtractionListener.FireEntryExtractionProgress(entry, total, iterations);
+                var iterations = 0;
+                long total = 0;
+                while (ReadTransferBlock(source, array, out int count))
+                {
+                    total += count;
+                    destination.Write(array, 0, count);
+                    iterations++;
+                    readerExtractionListener.FireEntryExtractionProgress(entry, total, iterations);
+                }
+                return total;
             }
-            return total;
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(array);
+            }
         }
 
         private static bool ReadTransferBlock(Stream source, byte[] array, out int count)
@@ -266,9 +278,9 @@ namespace SharpCompress
 
         private static byte[] GetTransferByteArray()
         {
-            return new byte[81920];
+            return ArrayPool<byte>.Shared.Rent(81920);
         }
-
+        
         public static bool ReadFully(this Stream stream, byte[] buffer)
         {
             int total = 0;
@@ -283,31 +295,25 @@ namespace SharpCompress
             }
             return (total >= buffer.Length);
         }
+        
+        public static bool ReadFully(this Stream stream, Span<byte> buffer)
+        {
+            int total = 0;
+            int read;
+            while ((read = stream.Read(buffer.Slice(total, buffer.Length - total))) > 0)
+            {
+                total += read;
+                if (total >= buffer.Length)
+                {
+                    return true;
+                }
+            }
+            return (total >= buffer.Length);
+        }
 
         public static string TrimNulls(this string source)
         {
             return source.Replace('\0', ' ').Trim();
-        }
-
-        public static bool BinaryEquals(this byte[] source, byte[] target)
-        {
-            if (source.Length != target.Length)
-            {
-                return false;
-            }
-            for (int i = 0; i < source.Length; ++i)
-            {
-                if (source[i] != target[i])
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        public static void CopyTo(this byte[] array, byte[] destination, int index)
-        {
-            Array.Copy(array, 0, destination, index, array.Length);
         }
     }
 }

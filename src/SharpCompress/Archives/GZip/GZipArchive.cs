@@ -13,16 +13,14 @@ namespace SharpCompress.Archives.GZip
 {
     public class GZipArchive : AbstractWritableArchive<GZipArchiveEntry, GZipVolume>
     {
-#if !NO_FILE
-
         /// <summary>
         /// Constructor expects a filepath to an existing file.
         /// </summary>
         /// <param name="filePath"></param>
         /// <param name="readerOptions"></param>
-        public static GZipArchive Open(string filePath, ReaderOptions readerOptions = null)
+        public static GZipArchive Open(string filePath, ReaderOptions? readerOptions = null)
         {
-            filePath.CheckNotNullOrEmpty("filePath");
+            filePath.CheckNotNullOrEmpty(nameof(filePath));
             return Open(new FileInfo(filePath), readerOptions ?? new ReaderOptions());
         }
 
@@ -31,21 +29,20 @@ namespace SharpCompress.Archives.GZip
         /// </summary>
         /// <param name="fileInfo"></param>
         /// <param name="readerOptions"></param>
-        public static GZipArchive Open(FileInfo fileInfo, ReaderOptions readerOptions = null)
+        public static GZipArchive Open(FileInfo fileInfo, ReaderOptions? readerOptions = null)
         {
-            fileInfo.CheckNotNull("fileInfo");
+            fileInfo.CheckNotNull(nameof(fileInfo));
             return new GZipArchive(fileInfo, readerOptions ?? new ReaderOptions());
         }
-#endif
 
         /// <summary>
         /// Takes a seekable Stream as a source
         /// </summary>
         /// <param name="stream"></param>
         /// <param name="readerOptions"></param>
-        public static GZipArchive Open(Stream stream, ReaderOptions readerOptions = null)
+        public static GZipArchive Open(Stream stream, ReaderOptions? readerOptions = null)
         {
-            stream.CheckNotNull("stream");
+            stream.CheckNotNull(nameof(stream));
             return new GZipArchive(stream, readerOptions ?? new ReaderOptions());
         }
 
@@ -53,8 +50,6 @@ namespace SharpCompress.Archives.GZip
         {
             return new GZipArchive();
         }
-
-#if !NO_FILE
 
         /// <summary>
         /// Constructor with a FileInfo object to an existing file.
@@ -82,10 +77,9 @@ namespace SharpCompress.Archives.GZip
             {
                 return false;
             }
-            using (Stream stream = fileInfo.OpenRead())
-            {
-                return IsGZipFile(stream);
-            }
+
+            using Stream stream = fileInfo.OpenRead();
+            return IsGZipFile(stream);
         }
 
         public void SaveTo(string filePath)
@@ -100,12 +94,11 @@ namespace SharpCompress.Archives.GZip
                 SaveTo(stream, new WriterOptions(CompressionType.GZip));
             }
         }
-#endif
 
         public static bool IsGZipFile(Stream stream)
         {
             // read the header on the first read
-            byte[] header = new byte[10];
+            Span<byte> header = stackalloc byte[10];
 
             // workitem 8501: handle edge case (decompress empty stream)
             if (!stream.ReadFully(header))

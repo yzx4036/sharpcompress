@@ -1,4 +1,6 @@
-﻿using System;
+﻿#nullable disable
+
+using System;
 using System.IO;
 using SharpCompress.Common.Rar.Headers;
 
@@ -6,7 +8,7 @@ namespace SharpCompress.Compressors.Rar
 {
     internal class RarStream : Stream
     {
-        private readonly Unpack unpack;
+        private readonly IRarUnpack unpack;
         private readonly FileHeader fileHeader;
         private readonly Stream readStream;
 
@@ -22,25 +24,24 @@ namespace SharpCompress.Compressors.Rar
         private int outTotal;
         private bool isDisposed;
 
-        public RarStream(Unpack unpack, FileHeader fileHeader, Stream readStream)
+        public RarStream(IRarUnpack unpack, FileHeader fileHeader, Stream readStream)
         {
             this.unpack = unpack;
             this.fileHeader = fileHeader;
             this.readStream = readStream;
             fetch = true;
-            unpack.doUnpack(fileHeader, readStream, this);
+            unpack.DoUnpack(fileHeader, readStream, this);
             fetch = false;
         }
 
         protected override void Dispose(bool disposing)
         {
-            if (isDisposed)
+            if (!isDisposed)
             {
-                return;
+                isDisposed = true;
+                base.Dispose(disposing);
+                readStream.Dispose();
             }
-            isDisposed = true;
-            base.Dispose(disposing);
-            readStream.Dispose();
         }
 
         public override bool CanRead => true;
@@ -76,7 +77,7 @@ namespace SharpCompress.Compressors.Rar
                 outOffset = offset;
                 outCount = count;
                 fetch = true;
-                unpack.doUnpack();
+                unpack.DoUnpack();
                 fetch = false;
             }
             return outTotal;

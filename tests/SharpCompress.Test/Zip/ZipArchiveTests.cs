@@ -7,6 +7,7 @@ using SharpCompress.Archives.Zip;
 using SharpCompress.Common;
 using SharpCompress.Readers;
 using SharpCompress.Writers;
+using SharpCompress.Writers.Zip;
 using Xunit;
 
 namespace SharpCompress.Test.Zip
@@ -48,6 +49,11 @@ namespace SharpCompress.Test.Zip
         public void Zip_Deflate_ArchiveStreamRead()
         {
             ArchiveStreamRead("Zip.deflate.zip");
+        }
+        [Fact]
+        public void Zip_Deflate64_ArchiveStreamRead()
+        {
+            ArchiveStreamRead("Zip.deflate64.zip");
         }
 
         [Fact]
@@ -101,6 +107,11 @@ namespace SharpCompress.Test.Zip
         {
             ArchiveFileRead("Zip.deflate.zip");
         }
+        [Fact]
+        public void Zip_Deflate64_ArchiveFileRead()
+        {
+            ArchiveFileRead("Zip.deflate64.zip");
+        }
 
         [Fact]
         public void Zip_LZMA_Streamed_ArchiveFileRead()
@@ -147,31 +158,37 @@ namespace SharpCompress.Test.Zip
             string unmodified = Path.Combine(TEST_ARCHIVES_PATH, "Zip.deflate.noEmptyDirs.zip");
             string modified = Path.Combine(TEST_ARCHIVES_PATH, "Zip.deflate.mod.zip");
 
-            ResetScratch();
             using (var archive = ZipArchive.Open(unmodified))
             {
                 var entry = archive.Entries.Single(x => x.Key.EndsWith("jpg"));
                 archive.RemoveEntry(entry);
-                archive.SaveTo(scratchPath, CompressionType.Deflate);
+
+                WriterOptions writerOptions = new ZipWriterOptions(CompressionType.Deflate);
+                writerOptions.ArchiveEncoding.Default = Encoding.GetEncoding(866);
+
+                archive.SaveTo(scratchPath, writerOptions);
             }
-            CompareArchivesByPath(modified, scratchPath);
+            CompareArchivesByPath(modified, scratchPath, Encoding.GetEncoding(866));
         }
 
         [Fact]
         public void Zip_Random_Write_Add()
         {
-            string jpg = Path.Combine(ORIGINAL_FILES_PATH, "jpg","test.jpg");
+            string jpg = Path.Combine(ORIGINAL_FILES_PATH, "jpg", "test.jpg");
             string scratchPath = Path.Combine(SCRATCH_FILES_PATH, "Zip.deflate.mod.zip");
             string unmodified = Path.Combine(TEST_ARCHIVES_PATH, "Zip.deflate.mod.zip");
             string modified = Path.Combine(TEST_ARCHIVES_PATH, "Zip.deflate.mod2.zip");
 
-            ResetScratch();
             using (var archive = ZipArchive.Open(unmodified))
             {
                 archive.AddEntry("jpg\\test.jpg", jpg);
-                archive.SaveTo(scratchPath, CompressionType.Deflate);
+
+                WriterOptions writerOptions = new ZipWriterOptions(CompressionType.Deflate);
+                writerOptions.ArchiveEncoding.Default = Encoding.GetEncoding(866);
+
+                archive.SaveTo(scratchPath, writerOptions);
             }
-            CompareArchivesByPath(modified, scratchPath);
+            CompareArchivesByPath(modified, scratchPath, Encoding.GetEncoding(866));
         }
 
         [Fact]
@@ -180,7 +197,6 @@ namespace SharpCompress.Test.Zip
             string scratchPath1 = Path.Combine(SCRATCH_FILES_PATH, "a.zip");
             string scratchPath2 = Path.Combine(SCRATCH_FILES_PATH, "b.zip");
 
-            ResetScratch();
             using (var arc = ZipArchive.Create())
             {
                 string str = "test.txt";
@@ -196,7 +212,6 @@ namespace SharpCompress.Test.Zip
         [Fact]
         public void Zip_Removal_Poly()
         {
-            ResetScratch();
 
             string scratchPath = Path.Combine(TEST_ARCHIVES_PATH, "Zip.deflate.noEmptyDirs.zip");
 
@@ -244,7 +259,6 @@ namespace SharpCompress.Test.Zip
         [Fact]
         public void Zip_Create_New()
         {
-            ResetScratch();
             foreach (var file in Directory.EnumerateFiles(ORIGINAL_FILES_PATH, "*.*", SearchOption.AllDirectories))
             {
                 var newFileName = file.Substring(ORIGINAL_FILES_PATH.Length);
@@ -266,16 +280,19 @@ namespace SharpCompress.Test.Zip
             using (var archive = ZipArchive.Create())
             {
                 archive.AddAllFromDirectory(SCRATCH_FILES_PATH);
-                archive.SaveTo(scratchPath, CompressionType.Deflate);
+
+                WriterOptions writerOptions = new ZipWriterOptions(CompressionType.Deflate);
+                writerOptions.ArchiveEncoding.Default = Encoding.GetEncoding(866);
+
+                archive.SaveTo(scratchPath, writerOptions);
             }
-            CompareArchivesByPath(unmodified, scratchPath);
+            CompareArchivesByPath(unmodified, scratchPath, Encoding.GetEncoding(866));
             Directory.Delete(SCRATCH_FILES_PATH, true);
         }
 
         [Fact]
         public void Zip_Create_New_Add_Remove()
         {
-            ResetScratch();
             foreach (var file in Directory.EnumerateFiles(ORIGINAL_FILES_PATH, "*.*", SearchOption.AllDirectories))
             {
                 var newFileName = file.Substring(ORIGINAL_FILES_PATH.Length);
@@ -297,7 +314,7 @@ namespace SharpCompress.Test.Zip
             {
                 archive.AddAllFromDirectory(SCRATCH_FILES_PATH);
                 archive.RemoveEntry(archive.Entries.Single(x => x.Key.EndsWith("jpg", StringComparison.OrdinalIgnoreCase)));
-                Assert.False(archive.Entries.Any(x => x.Key.EndsWith("jpg")));
+                Assert.Null(archive.Entries.FirstOrDefault(x => x.Key.EndsWith("jpg")));
             }
             Directory.Delete(SCRATCH_FILES_PATH, true);
         }
@@ -305,11 +322,10 @@ namespace SharpCompress.Test.Zip
         [Fact]
         public void Zip_Deflate_WinzipAES_Read()
         {
-            ResetScratch();
             using (var reader = ZipArchive.Open(Path.Combine(TEST_ARCHIVES_PATH, "Zip.deflate.WinzipAES.zip"), new ReaderOptions()
-                                                                                                               {
-                                                                                                                   Password = "test"
-                                                                                                                }))
+            {
+                Password = "test"
+            }))
             {
                 foreach (var entry in reader.Entries.Where(x => !x.IsDirectory))
                 {
@@ -326,7 +342,6 @@ namespace SharpCompress.Test.Zip
         [Fact]
         public void Zip_Deflate_WinzipAES_MultiOpenEntryStream()
         {
-            ResetScratch();
             using (var reader = ZipArchive.Open(Path.Combine(TEST_ARCHIVES_PATH, "Zip.deflate.WinzipAES2.zip"), new ReaderOptions()
             {
                 Password = "test"
@@ -343,9 +358,24 @@ namespace SharpCompress.Test.Zip
         }
 
         [Fact]
+        public void Zip_Read_Volume_Comment()
+        {
+            using (var reader = ZipArchive.Open(Path.Combine(TEST_ARCHIVES_PATH, "Zip.zip64.zip"), new ReaderOptions()
+            {
+                Password = "test"
+            }))
+            {
+                var isComplete = reader.IsComplete;
+                Assert.Equal(1, reader.Volumes.Count);
+
+                string expectedComment = "Encoding:utf-8 || Compression:Deflate levelDefault || Encrypt:None || ZIP64:Always\r\nCreated at 2017-Jan-23 14:10:43 || DotNetZip Tool v1.9.1.8\r\nTest zip64 archive";
+                Assert.Equal(expectedComment, reader.Volumes.First().Comment);
+            }
+        }
+
+        [Fact]
         public void Zip_BZip2_Pkware_Read()
         {
-            ResetScratch();
             using (var reader = ZipArchive.Open(Path.Combine(TEST_ARCHIVES_PATH, "Zip.bzip2.pkware.zip"), new ReaderOptions()
             {
                 Password = "test"
@@ -368,11 +398,12 @@ namespace SharpCompress.Test.Zip
         {
             string unmodified = Path.Combine(TEST_ARCHIVES_PATH, "Zip.deflate.noEmptyDirs.zip");
 
-            ResetScratch();
             ZipArchive a = ZipArchive.Open(unmodified);
             int count = 0;
             foreach (var e in a.Entries)
+            {
                 count++;
+            }
 
             //Prints 3
             Assert.Equal(3, count);
@@ -397,7 +428,9 @@ namespace SharpCompress.Test.Zip
 
             int count3 = 0;
             foreach (var e in a.Entries)
+            {
                 count3++;
+            }
 
             Assert.Equal(3, count3);
         }
@@ -418,15 +451,40 @@ namespace SharpCompress.Test.Zip
                         {
                             using (var memoryStream = new MemoryStream())
                             using (Stream entryStream = entry.OpenEntryStream())
+                            {
                                 entryStream.CopyTo(memoryStream);
+                            }
                         }
                     }
                 }
             }
-
         }
 
-        class NonSeekableMemoryStream : MemoryStream
+        [SkippableFact]
+        public void Zip_Evil_Throws_Exception()
+        {
+            //windows only because of the paths
+            Skip.IfNot(Environment.OSVersion.Platform == PlatformID.Win32NT);
+
+            string zipFile = Path.Combine(TEST_ARCHIVES_PATH, "Zip.Evil.zip");
+
+            Assert.ThrowsAny<Exception>(() =>
+            {
+                using (var archive = ZipArchive.Open(zipFile))
+                {
+                    foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
+                    {
+                        entry.WriteToDirectory(SCRATCH_FILES_PATH, new ExtractionOptions()
+                        {
+                            ExtractFullPath = true,
+                            Overwrite = true
+                        });
+                    }
+                }
+            });
+        }
+
+        private class NonSeekableMemoryStream : MemoryStream
         {
             public override bool CanSeek => false;
         }
@@ -456,9 +514,66 @@ namespace SharpCompress.Test.Zip
                         byte[] buf = new byte[bufSize];
                         int bytesRead = 0;
                         while ((bytesRead = entryStream.Read(buf, 0, bufSize)) > 0)
+                        {
                             tempStream.Write(buf, 0, bytesRead);
+                        }
                     }
                 }
+            }
+        }
+
+        [Fact]
+        public void Zip_BadLocalExtra_Read()
+        {
+            string zipPath = Path.Combine(TEST_ARCHIVES_PATH, "Zip.badlocalextra.zip");
+
+            using (ZipArchive za = ZipArchive.Open(zipPath))
+            {
+                var ex = Record.Exception(() =>
+                {
+                    var firstEntry = za.Entries.First(x => x.Key == "first.txt");
+                    var buffer = new byte[4096];
+
+                    using (var memoryStream = new MemoryStream())
+                    using (var firstStream = firstEntry.OpenEntryStream())
+                    {
+                        firstStream.CopyTo(memoryStream);
+                        Assert.Equal(199, memoryStream.Length);
+                    }
+                });
+
+                Assert.Null(ex);
+            }
+        }
+
+        [Fact]
+        public void Zip_NoCompression_DataDescriptors_Read()
+        {
+            string zipPath = Path.Combine(TEST_ARCHIVES_PATH, "Zip.none.datadescriptors.zip");
+
+            using (ZipArchive za = ZipArchive.Open(zipPath))
+            {
+                var firstEntry = za.Entries.First(x => x.Key == "first.txt");
+                var buffer = new byte[4096];
+
+                using (var memoryStream = new MemoryStream())
+                using (var firstStream = firstEntry.OpenEntryStream())
+                {
+                    firstStream.CopyTo(memoryStream);
+                    Assert.Equal(199, memoryStream.Length);
+                }
+            }
+        }
+
+        [Fact]
+        public void Zip_LongComment_Read()
+        {
+            string zipPath = Path.Combine(TEST_ARCHIVES_PATH, "Zip.LongComment.zip");
+
+            using(ZipArchive za = ZipArchive.Open(zipPath))
+            {
+                var count = za.Entries.Count;
+                Assert.Equal(1, count);
             }
         }
     }

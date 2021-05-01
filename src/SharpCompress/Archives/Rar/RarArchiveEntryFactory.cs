@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
-using SharpCompress.Common;
 using SharpCompress.Common.Rar;
-using SharpCompress.Common.Rar.Headers;
+using SharpCompress.Readers;
 
 namespace SharpCompress.Archives.Rar
 {
@@ -25,7 +24,7 @@ namespace SharpCompress.Archives.Rar
             {
                 groupedParts.Add(fp);
 
-                if (!FlagUtility.HasFlag((long)fp.FileHeader.FileFlags, (long)FileFlags.SPLIT_AFTER))
+                if (!fp.FileHeader.IsSplitAfter)
                 {
                     yield return groupedParts;
                     groupedParts = new List<RarFilePart>();
@@ -38,11 +37,12 @@ namespace SharpCompress.Archives.Rar
         }
 
         internal static IEnumerable<RarArchiveEntry> GetEntries(RarArchive archive,
-                                                                IEnumerable<RarVolume> rarParts)
+                                                                IEnumerable<RarVolume> rarParts,
+                                                                ReaderOptions readerOptions)
         {
             foreach (var groupedParts in GetMatchedFileParts(rarParts))
             {
-                yield return new RarArchiveEntry(archive, groupedParts);
+                yield return new RarArchiveEntry(archive, groupedParts, readerOptions);
             }
         }
     }

@@ -5,9 +5,9 @@ using SharpCompress.IO;
 
 namespace SharpCompress.Common.Zip
 {
-    internal class StreamingZipFilePart : ZipFilePart
+    internal sealed class StreamingZipFilePart : ZipFilePart
     {
-        private Stream decompressionStream;
+        private Stream? _decompressionStream;
 
         internal StreamingZipFilePart(ZipFileEntry header, Stream stream)
             : base(header, stream)
@@ -25,12 +25,12 @@ namespace SharpCompress.Common.Zip
             {
                 return Stream.Null;
             }
-            decompressionStream = CreateDecompressionStream(GetCryptoStream(CreateBaseStream()), Header.CompressionMethod);
+            _decompressionStream = CreateDecompressionStream(GetCryptoStream(CreateBaseStream()), Header.CompressionMethod);
             if (LeaveStreamOpen)
             {
-                return new NonDisposingStream(decompressionStream);
+                return new NonDisposingStream(_decompressionStream);
             }
-            return decompressionStream;
+            return _decompressionStream;
         }
 
         internal BinaryReader FixStreamedFileLocation(ref RewindableStream rewindableStream)
@@ -41,21 +41,18 @@ namespace SharpCompress.Common.Zip
             }
             if (Header.HasData && !Skipped)
             {
-                if (decompressionStream == null)
-                {
-                    decompressionStream = GetCompressedStream();
-                }
-                decompressionStream.Skip();
+                _decompressionStream ??= GetCompressedStream();
 
-                DeflateStream deflateStream = decompressionStream as DeflateStream;
-                if (deflateStream != null)
+                _decompressionStream.Skip();
+
+                if (_decompressionStream is DeflateStream deflateStream)
                 {
                     rewindableStream.Rewind(deflateStream.InputBuffer);
                 }
                 Skipped = true;
             }
             var reader = new BinaryReader(rewindableStream);
-            decompressionStream = null;
+            _decompressionStream = null;
             return reader;
         }
     }

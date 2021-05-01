@@ -1,16 +1,15 @@
 ﻿using System;
-using Org.BouncyCastle.Crypto.Parameters;
 
-namespace Org.BouncyCastle.Crypto.Engines
+namespace SharpCompress.Crypto
 {
-    public class RijndaelEngine
+    public sealed class RijndaelEngine
         : IBlockCipher
     {
-        private static readonly int MAXROUNDS = 14;
+        private const int MAXROUNDS = 14;
 
-        private static readonly int MAXKC = (256 / 4);
+        private const int MAXKC = (256 / 4);
 
-        private static readonly byte[] Logtable =
+        private static ReadOnlySpan<byte> Logtable => new byte[]
         {
             0, 0, 25, 1, 50, 2, 26, 198,
             75, 199, 27, 104, 51, 238, 223, 3,
@@ -46,7 +45,7 @@ namespace Org.BouncyCastle.Crypto.Engines
             13, 99, 140, 128, 192, 247, 112, 7
         };
 
-        private static readonly byte[] Alogtable =
+        private static ReadOnlySpan<byte> Alogtable => new byte[]
         {
             0, 3, 5, 15, 17, 51, 85, 255, 26, 46, 114, 150, 161, 248, 19, 53,
             95, 225, 56, 72, 216, 115, 149, 164, 247, 2, 6, 10, 30, 34, 102, 170,
@@ -82,7 +81,7 @@ namespace Org.BouncyCastle.Crypto.Engines
             57, 75, 221, 124, 132, 151, 162, 253, 28, 36, 108, 180, 199, 82, 246, 1
         };
 
-        private static readonly byte[] S =
+        private static ReadOnlySpan<byte> S => new byte[]
         {
             99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118,
             202, 130, 201, 125, 250, 89, 71, 240, 173, 212, 162, 175, 156, 164, 114, 192,
@@ -102,7 +101,7 @@ namespace Org.BouncyCastle.Crypto.Engines
             140, 161, 137, 13, 191, 230, 66, 104, 65, 153, 45, 15, 176, 84, 187, 22
         };
 
-        private static readonly byte[] Si =
+        private static ReadOnlySpan<byte> Si => new byte[]
         {
             82, 9, 106, 213, 48, 54, 165, 56, 191, 64, 163, 158, 129, 243, 215, 251,
             124, 227, 57, 130, 155, 47, 255, 135, 52, 142, 67, 68, 196, 222, 233, 203,
@@ -122,13 +121,13 @@ namespace Org.BouncyCastle.Crypto.Engines
             23, 43, 4, 126, 186, 119, 214, 38, 225, 105, 20, 99, 85, 33, 12, 125
         };
 
-        private static readonly byte[] rcon =
+        private static ReadOnlySpan<byte> rcon => new byte[]
         {
             0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a,
             0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91
         };
 
-        static readonly byte[][] shifts0 =
+        private static readonly byte[][] shifts0 =
         {
             new byte[] {0, 8, 16, 24},
             new byte[] {0, 8, 16, 24},
@@ -137,7 +136,7 @@ namespace Org.BouncyCastle.Crypto.Engines
             new byte[] {0, 8, 24, 32}
         };
 
-        static readonly byte[][] shifts1 =
+        private static readonly byte[][] shifts1 =
         {
             new byte[] {0, 24, 16, 8},
             new byte[] {0, 32, 24, 16},
@@ -215,8 +214,7 @@ namespace Org.BouncyCastle.Crypto.Engines
         * xor corresponding text input and round key input bytes
         */
 
-        private void KeyAddition(
-            long[] rk)
+        private void KeyAddition(long[] rk)
         {
             A0 ^= rk[0];
             A1 ^= rk[1];
@@ -246,17 +244,14 @@ namespace Org.BouncyCastle.Crypto.Engines
         * The other three rows are shifted a variable amount
         */
 
-        private void ShiftRow(
-            byte[] shiftsSC)
+        private void ShiftRow(byte[] shiftsSC)
         {
             A1 = Shift(A1, shiftsSC[1]);
             A2 = Shift(A2, shiftsSC[2]);
             A3 = Shift(A3, shiftsSC[3]);
         }
 
-        private long ApplyS(
-            long r,
-            byte[] box)
+        private long ApplyS(long r, ReadOnlySpan<byte> box)
         {
             long res = 0;
 
@@ -273,8 +268,7 @@ namespace Org.BouncyCastle.Crypto.Engines
         * in the nonlinear S-box
         */
 
-        private void Substitution(
-            byte[] box)
+        private void Substitution(ReadOnlySpan<byte> box)
         {
             A0 = ApplyS(A0, box);
             A1 = ApplyS(A1, box);
@@ -362,7 +356,6 @@ namespace Org.BouncyCastle.Crypto.Engines
         private long[][] GenerateWorkingKey(
             byte[] key)
         {
-            int KC;
             int t, rconpointer = 0;
             int keyBits = key.Length * 8;
             byte[,] tk = new byte[4, MAXKC];
@@ -375,27 +368,15 @@ namespace Org.BouncyCastle.Crypto.Engines
                 W[i] = new long[4];
             }
 
-            switch (keyBits)
+            var KC = keyBits switch
             {
-                case 128:
-                    KC = 4;
-                    break;
-                case 160:
-                    KC = 5;
-                    break;
-                case 192:
-                    KC = 6;
-                    break;
-                case 224:
-                    KC = 7;
-                    break;
-                case 256:
-                    KC = 8;
-                    break;
-                default:
-                    throw new ArgumentException("Key length not 128/160/192/224/256 bits.");
-            }
-
+                128 => 4,
+                160 => 5,
+                192 => 6,
+                224 => 7,
+                256 => 8,
+                _ => throw new ArgumentException("Key length not 128/160/192/224/256 bits."),
+            };
             if (keyBits >= blockBits)
             {
                 ROUNDS = KC + 6;
@@ -490,7 +471,7 @@ namespace Org.BouncyCastle.Crypto.Engines
         private readonly long BC_MASK;
         private int ROUNDS;
         private readonly int blockBits;
-        private long[][] workingKey;
+        private long[][]? workingKey;
         private long A0, A1, A2, A3;
         private bool forEncryption;
         private readonly byte[] shifts0SC;
@@ -586,28 +567,24 @@ namespace Org.BouncyCastle.Crypto.Engines
             return BC / 2;
         }
 
-        public int ProcessBlock(
-            byte[] input,
-            int inOff,
-            byte[] output,
-            int outOff)
+        public int ProcessBlock(ReadOnlySpan<byte> input, Span<byte> output)
         {
-            if (workingKey == null)
+            if (workingKey is null)
             {
                 throw new InvalidOperationException("Rijndael engine not initialised");
             }
 
-            if ((inOff + (BC / 2)) > input.Length)
+            if (BC / 2 > input.Length)
             {
                 throw new DataLengthException("input buffer too short");
             }
 
-            if ((outOff + (BC / 2)) > output.Length)
+            if (BC / 2 > output.Length)
             {
                 throw new DataLengthException("output buffer too short");
             }
 
-            UnPackBlock(input, inOff);
+            UnPackBlock(input);
 
             if (forEncryption)
             {
@@ -618,7 +595,7 @@ namespace Org.BouncyCastle.Crypto.Engines
                 DecryptBlock(workingKey);
             }
 
-            PackBlock(output, outOff);
+            PackBlock(output);
 
             return BC / 2;
         }
@@ -627,11 +604,9 @@ namespace Org.BouncyCastle.Crypto.Engines
         {
         }
 
-        private void UnPackBlock(
-            byte[] bytes,
-            int off)
+        private void UnPackBlock(ReadOnlySpan<byte> bytes)
         {
-            int index = off;
+            int index = 0;
 
             A0 = bytes[index++] & 0xff;
             A1 = bytes[index++] & 0xff;
@@ -647,11 +622,9 @@ namespace Org.BouncyCastle.Crypto.Engines
             }
         }
 
-        private void PackBlock(
-            byte[] bytes,
-            int off)
+        private void PackBlock(Span<byte> bytes)
         {
-            int index = off;
+            int index = 0;
 
             for (int j = 0; j != BC; j += 8)
             {
@@ -662,8 +635,7 @@ namespace Org.BouncyCastle.Crypto.Engines
             }
         }
 
-        private void EncryptBlock(
-            long[][] rk)
+        private void EncryptBlock(long[][] rk)
         {
             int r;
 
@@ -691,8 +663,7 @@ namespace Org.BouncyCastle.Crypto.Engines
             KeyAddition(rk[ROUNDS]);
         }
 
-        private void DecryptBlock(
-            long[][] rk)
+        private void DecryptBlock(long[][] rk)
         {
             int r;
 

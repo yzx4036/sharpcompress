@@ -10,11 +10,11 @@ namespace SharpCompress.Common
         }
 
         internal ArchiveEncoding ArchiveEncoding { get; }
-        
+
         internal abstract string FilePartName { get; }
 
         internal abstract Stream GetCompressedStream();
-        internal abstract Stream GetRawStream();
+        internal abstract Stream? GetRawStream();
         internal bool Skipped { get; set; }
     }
 }

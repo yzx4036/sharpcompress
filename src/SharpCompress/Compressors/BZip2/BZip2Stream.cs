@@ -1,8 +1,9 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 
 namespace SharpCompress.Compressors.BZip2
 {
-    public class BZip2Stream : Stream
+    public sealed class BZip2Stream : Stream
     {
         private readonly Stream stream;
         private bool isDisposed;
@@ -12,19 +13,18 @@ namespace SharpCompress.Compressors.BZip2
         /// </summary>
         /// <param name="stream">The stream to read from</param>
         /// <param name="compressionMode">Compression Mode</param>
-        /// <param name="leaveOpen">Leave the underlying stream open when disposed.</param>
-        /// <param name="decompressContacted">Should the BZip2 stream continue to decompress the stream when the End Marker is found.</param>
-        public BZip2Stream(Stream stream, CompressionMode compressionMode, bool leaveOpen = false,
-                           bool decompressContacted = false)
+        /// <param name="decompressConcatenated">Decompress Concatenated</param>
+        public BZip2Stream(Stream stream, CompressionMode compressionMode,
+                           bool decompressConcatenated)
         {
             Mode = compressionMode;
             if (Mode == CompressionMode.Compress)
             {
-                this.stream = new CBZip2OutputStream(stream, leaveOpen);
+                this.stream = new CBZip2OutputStream(stream);
             }
             else
             {
-                this.stream = new CBZip2InputStream(stream, decompressContacted, leaveOpen);
+                this.stream = new CBZip2InputStream(stream, decompressConcatenated);
             }
         }
 
@@ -68,6 +68,11 @@ namespace SharpCompress.Compressors.BZip2
             return stream.Read(buffer, offset, count);
         }
 
+        public override int ReadByte()
+        {
+            return stream.ReadByte();
+        }
+
         public override long Seek(long offset, SeekOrigin origin)
         {
             return stream.Seek(offset, origin);
@@ -78,9 +83,28 @@ namespace SharpCompress.Compressors.BZip2
             stream.SetLength(value);
         }
 
+#if !NET461 && !NETSTANDARD2_0
+
+        public override int Read(Span<byte> buffer)
+        {
+            return stream.Read(buffer);
+        }
+
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            stream.Write(buffer);
+        }
+
+#endif
+
         public override void Write(byte[] buffer, int offset, int count)
         {
             stream.Write(buffer, offset, count);
+        }
+
+        public override void WriteByte(byte value)
+        {
+            stream.WriteByte(value);
         }
 
         /// <summary>

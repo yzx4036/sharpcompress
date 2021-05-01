@@ -1,5 +1,4 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
 
 namespace SharpCompress.Common.Zip.Headers
 {
@@ -21,10 +20,10 @@ namespace SharpCompress.Common.Zip.Headers
             TotalNumberOfEntries = (long)reader.ReadUInt64();
             DirectorySize = (long)reader.ReadUInt64();
             DirectoryStartOffsetRelativeToDisk = (long)reader.ReadUInt64();
-            DataSector = reader.ReadBytes((int)(SizeOfDirectoryEndRecord - SizeOfFixedHeaderDataExceptSignatureAndSizeFields));
+            DataSector = reader.ReadBytes((int)(SizeOfDirectoryEndRecord - SIZE_OF_FIXED_HEADER_DATA_EXCEPT_SIGNATURE_AND_SIZE_FIELDS));
         }
 
-        const int SizeOfFixedHeaderDataExceptSignatureAndSizeFields = 44;
+        private const int SIZE_OF_FIXED_HEADER_DATA_EXCEPT_SIGNATURE_AND_SIZE_FIELDS = 44;
 
         public long SizeOfDirectoryEndRecord { get; private set; }
 
@@ -44,6 +43,6 @@ namespace SharpCompress.Common.Zip.Headers
 
         public long DirectoryStartOffsetRelativeToDisk { get; private set; }
 
-        public byte[] DataSector { get; private set; }
+        public byte[]? DataSector { get; private set; }
     }
 }

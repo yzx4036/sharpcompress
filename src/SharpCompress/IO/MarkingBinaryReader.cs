@@ -1,7 +1,6 @@
 ﻿using System;
+using System.Buffers.Binary;
 using System.IO;
-using System.Linq;
-using SharpCompress.Converters;
 
 namespace SharpCompress.IO
 {
@@ -36,12 +35,22 @@ namespace SharpCompress.IO
 
         public override bool ReadBoolean()
         {
-            return ReadBytes(1).Single() != 0;
+            return ReadByte() != 0;
         }
 
+        // NOTE: there is a somewhat fragile dependency on the internals of this class
+        // with RarCrcBinaryReader and RarCryptoBinaryReader.
+        //
+        // RarCrcBinaryReader/RarCryptoBinaryReader need to override any specific methods
+        // that call directly to the base BinaryReader and do not delegate to other methods
+        // in this class so that it can track the each byte being read.
+        //
+        // if altering this class in a way that changes the implementation be sure to
+        // update RarCrcBinaryReader/RarCryptoBinaryReader.
         public override byte ReadByte()
         {
-            return ReadBytes(1).Single();
+            CurrentReadByteCount++;
+            return base.ReadByte();
         }
 
         public override byte[] ReadBytes(int count)
@@ -65,13 +74,6 @@ namespace SharpCompress.IO
             throw new NotSupportedException();
         }
 
-#if !SILVERLIGHT
-        public override decimal ReadDecimal()
-        {
-            throw new NotSupportedException();
-        }
-#endif
-
         public override double ReadDouble()
         {
             throw new NotSupportedException();
@@ -79,17 +81,17 @@ namespace SharpCompress.IO
 
         public override short ReadInt16()
         {
-            return DataConverter.LittleEndian.GetInt16(ReadBytes(2), 0);
+            return BinaryPrimitives.ReadInt16LittleEndian(ReadBytes(2));
         }
 
         public override int ReadInt32()
         {
-            return DataConverter.LittleEndian.GetInt32(ReadBytes(4), 0);
+            return BinaryPrimitives.ReadInt32LittleEndian(ReadBytes(4));
         }
 
         public override long ReadInt64()
         {
-            return DataConverter.LittleEndian.GetInt64(ReadBytes(8), 0);
+            return BinaryPrimitives.ReadInt64LittleEndian(ReadBytes(8));
         }
 
         public override sbyte ReadSByte()
@@ -109,17 +111,101 @@ namespace SharpCompress.IO
 
         public override ushort ReadUInt16()
         {
-            return DataConverter.LittleEndian.GetUInt16(ReadBytes(2), 0);
+            return BinaryPrimitives.ReadUInt16LittleEndian(ReadBytes(2));
         }
 
         public override uint ReadUInt32()
         {
-            return DataConverter.LittleEndian.GetUInt32(ReadBytes(4), 0);
+            return BinaryPrimitives.ReadUInt32LittleEndian(ReadBytes(4));
         }
 
         public override ulong ReadUInt64()
         {
-            return DataConverter.LittleEndian.GetUInt64(ReadBytes(8), 0);
+            return BinaryPrimitives.ReadUInt64LittleEndian(ReadBytes(8));
+        }
+
+        // RAR5 style variable length encoded value
+        // maximum value of 0xffffffffffffffff (64 bits)
+        // technote: "implies max 10 bytes consumed" -- but not really because we could extend indefinitely using 0x80 0x80 ... 0x80 00
+        //
+        // Variable length integer. Can include one or more bytes, where lower 7 bits of every byte contain integer data
+        // and highest bit in every byte is the continuation flag. If highest bit is 0, this is the last byte in sequence.
+        // So first byte contains 7 least significant bits of integer and continuation flag. Second byte, if present,
+        // contains next 7 bits and so on.
+        public ulong ReadRarVInt(int maxBytes = 10)
+        {
+            // hopefully this gets inlined
+            return DoReadRarVInt((maxBytes - 1) * 7);
+        }
+
+        private ulong DoReadRarVInt(int maxShift)
+        {
+            int shift = 0;
+            ulong result = 0;
+            do
+            {
+                byte b0 = ReadByte();
+                uint b1 = ((uint)b0) & 0x7f;
+                ulong n = b1;
+                ulong shifted = n << shift;
+                if (n != shifted >> shift)
+                {
+                    // overflow
+                    break;
+                }
+                result |= shifted;
+                if (b0 == b1)
+                {
+                    return result;
+                }
+                shift += 7;
+            } while (shift <= maxShift);
+
+            throw new FormatException("malformed vint");
+        }
+
+        public uint ReadRarVIntUInt32(int maxBytes = 5)
+        {
+            // hopefully this gets inlined
+            return DoReadRarVIntUInt32((maxBytes - 1) * 7);
+        }
+
+        public ushort ReadRarVIntUInt16(int maxBytes = 3)
+        {
+            // hopefully this gets inlined
+            return checked((ushort)DoReadRarVIntUInt32((maxBytes - 1) * 7));
+        }
+
+        public byte ReadRarVIntByte(int maxBytes = 2)
+        {
+            // hopefully this gets inlined
+            return checked((byte)DoReadRarVIntUInt32((maxBytes - 1) * 7));
+        }
+
+        private uint DoReadRarVIntUInt32(int maxShift)
+        {
+            int shift = 0;
+            uint result = 0;
+            do
+            {
+                byte b0 = ReadByte();
+                uint b1 = ((uint)b0) & 0x7f;
+                uint n = b1;
+                uint shifted = n << shift;
+                if (n != shifted >> shift)
+                {
+                    // overflow
+                    break;
+                }
+                result |= shifted;
+                if (b0 == b1)
+                {
+                    return result;
+                }
+                shift += 7;
+            } while (shift <= maxShift);
+
+            throw new FormatException("malformed vint");
         }
     }
 }

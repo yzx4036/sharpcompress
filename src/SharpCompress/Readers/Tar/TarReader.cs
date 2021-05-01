@@ -27,35 +27,35 @@ namespace SharpCompress.Readers.Tar
 
         public override TarVolume Volume { get; }
 
-        internal override Stream RequestInitialStream()
+        protected override Stream RequestInitialStream()
         {
             var stream = base.RequestInitialStream();
             switch (compressionType)
             {
                 case CompressionType.BZip2:
-                {
-                    return new BZip2Stream(stream, CompressionMode.Decompress, false);
-                }
+                    {
+                        return new BZip2Stream(stream, CompressionMode.Decompress, false);
+                    }
                 case CompressionType.GZip:
-                {
-                    return new GZipStream(stream, CompressionMode.Decompress);
-                }
+                    {
+                        return new GZipStream(stream, CompressionMode.Decompress);
+                    }
                 case CompressionType.LZip:
-                {
-                    return new LZipStream(stream, CompressionMode.Decompress);
-                }
+                    {
+                        return new LZipStream(stream, CompressionMode.Decompress);
+                    }
                 case CompressionType.Xz:
-                {
-                    return new XZStream(stream);
-                }
+                    {
+                        return new XZStream(stream);
+                    }
                 case CompressionType.None:
-                {
-                    return stream;
-                }
+                    {
+                        return stream;
+                    }
                 default:
-                {
-                    throw new NotSupportedException("Invalid compression type: " + compressionType);
-                }
+                    {
+                        throw new NotSupportedException("Invalid compression type: " + compressionType);
+                    }
             }
         }
 
@@ -67,9 +67,9 @@ namespace SharpCompress.Readers.Tar
         /// <param name="stream"></param>
         /// <param name="options"></param>
         /// <returns></returns>
-        public static TarReader Open(Stream stream, ReaderOptions options = null)
+        public static TarReader Open(Stream stream, ReaderOptions? options = null)
         {
-            stream.CheckNotNull("stream");
+            stream.CheckNotNull(nameof(stream));
             options = options ?? new ReaderOptions();
             RewindableStream rewindableStream = new RewindableStream(stream);
             rewindableStream.StartRecording();
@@ -102,7 +102,7 @@ namespace SharpCompress.Readers.Tar
             if (LZipStream.IsLZipFile(rewindableStream))
             {
                 rewindableStream.Rewind(false);
-                LZipStream testStream = new LZipStream(rewindableStream, CompressionMode.Decompress, false);
+                LZipStream testStream = new LZipStream(rewindableStream, CompressionMode.Decompress);
                 if (TarArchive.IsTarFile(testStream))
                 {
                     rewindableStream.Rewind(true);
@@ -116,7 +116,7 @@ namespace SharpCompress.Readers.Tar
 
         #endregion Open
 
-        internal override IEnumerable<TarEntry> GetEntries(Stream stream)
+        protected override IEnumerable<TarEntry> GetEntries(Stream stream)
         {
             return TarEntry.GetEntries(StreamingMode.Streaming, stream, compressionType, Options.ArchiveEncoding);
         }

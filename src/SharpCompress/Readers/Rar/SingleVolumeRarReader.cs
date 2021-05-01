@@ -18,12 +18,12 @@ namespace SharpCompress.Readers.Rar
         {
             if (archive.IsMultiVolume)
             {
-                throw new MultiVolumeExtractionException(
-                                                         "Streamed archive is a Multi-volume archive.  Use different RarReader method to extract.");
+                var msg = "Streamed archive is a Multi-volume archive.  Use different RarReader method to extract.";
+                throw new MultiVolumeExtractionException(msg);
             }
         }
 
-        internal override Stream RequestInitialStream()
+        protected override Stream RequestInitialStream()
         {
             return stream;
         }

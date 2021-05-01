@@ -1,4 +1,6 @@
-﻿using System;
+﻿#nullable disable
+
+using System;
 using System.Collections.Generic;
 using System.IO;
 using SharpCompress.Common;
@@ -6,7 +8,7 @@ using SharpCompress.IO;
 
 namespace SharpCompress.Archives.GZip
 {
-    internal class GZipWritableArchiveEntry : GZipArchiveEntry, IWritableArchiveEntry
+    internal sealed class GZipWritableArchiveEntry : GZipArchiveEntry, IWritableArchiveEntry
     {
         private readonly bool closeStream;
         private readonly Stream stream;
@@ -42,7 +44,7 @@ namespace SharpCompress.Archives.GZip
 
         public override bool IsDirectory => false;
 
-        public override bool IsSplit => false;
+        public override bool IsSplitAfter => false;
 
         internal override IEnumerable<FilePart> Parts => throw new NotImplementedException();
 

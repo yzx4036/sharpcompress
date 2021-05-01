@@ -33,51 +33,43 @@ namespace SharpCompress.Compressors.ADC
     /// </summary>
     public static class ADCBase
     {
-        const int Plain = 1;
-        const int TwoByte = 2;
-        const int ThreeByte = 3;
+        private const int PLAIN = 1;
+        private const int TWO_BYTE = 2;
+        private const int THREE_BYTE = 3;
 
-        static int GetChunkType(byte byt)
+        private static int GetChunkType(byte byt)
         {
             if ((byt & 0x80) == 0x80)
             {
-                return Plain;
+                return PLAIN;
             }
             if ((byt & 0x40) == 0x40)
             {
-                return ThreeByte;
+                return THREE_BYTE;
             }
-            return TwoByte;
+            return TWO_BYTE;
         }
 
-        static int GetChunkSize(byte byt)
+        private static int GetChunkSize(byte byt)
         {
-            switch (GetChunkType(byt))
+            return GetChunkType(byt) switch
             {
-                case Plain:
-                    return (byt & 0x7F) + 1;
-                case TwoByte:
-                    return ((byt & 0x3F) >> 2) + 3;
-                case ThreeByte:
-                    return (byt & 0x3F) + 4;
-                default:
-                    return -1;
-            }
+                PLAIN => (byt & 0x7F) + 1,
+                TWO_BYTE => ((byt & 0x3F) >> 2) + 3,
+                THREE_BYTE => (byt & 0x3F) + 4,
+                _ => -1,
+            };
         }
 
-        static int GetOffset(byte[] chunk, int position)
+        private static int GetOffset(ReadOnlySpan<byte> chunk)
         {
-            switch (GetChunkType(chunk[position]))
+            return GetChunkType(chunk[0]) switch
             {
-                case Plain:
-                    return 0;
-                case TwoByte:
-                    return ((chunk[position] & 0x03) << 8) + chunk[position + 1];
-                case ThreeByte:
-                    return (chunk[position + 1] << 8) + chunk[position + 2];
-                default:
-                    return -1;
-            }
+                PLAIN => 0,
+                TWO_BYTE => ((chunk[0] & 0x03) << 8) + chunk[1],
+                THREE_BYTE => (chunk[1] << 8) + chunk[2],
+                _ => -1,
+            };
         }
 
         /// <summary>
@@ -87,7 +79,7 @@ namespace SharpCompress.Compressors.ADC
         /// <param name="output">Buffer to hold decompressed data</param>
         /// <param name="bufferSize">Max size for decompressed data</param>
         /// <returns>How many bytes are stored on <paramref name="output"/></returns>
-        public static int Decompress(byte[] input, out byte[] output, int bufferSize = 262144)
+        public static int Decompress(byte[] input, out byte[]? output, int bufferSize = 262144)
         {
             return Decompress(new MemoryStream(input), out output, bufferSize);
         }
@@ -99,11 +91,11 @@ namespace SharpCompress.Compressors.ADC
         /// <param name="output">Buffer to hold decompressed data</param>
         /// <param name="bufferSize">Max size for decompressed data</param>
         /// <returns>How many bytes are stored on <paramref name="output"/></returns>
-        public static int Decompress(Stream input, out byte[] output, int bufferSize = 262144)
+        public static int Decompress(Stream input, out byte[]? output, int bufferSize = 262144)
         {
             output = null;
 
-            if (input == null || input.Length == 0)
+            if (input is null || input.Length == 0)
             {
                 return 0;
             }
@@ -116,7 +108,7 @@ namespace SharpCompress.Compressors.ADC
             byte[] buffer = new byte[bufferSize];
             int outPosition = 0;
             bool full = false;
-            MemoryStream tempMs;
+            Span<byte> temp = stackalloc byte[3];
 
             while (position < input.Length)
             {
@@ -130,7 +122,7 @@ namespace SharpCompress.Compressors.ADC
 
                 switch (chunkType)
                 {
-                    case Plain:
+                    case PLAIN:
                         chunkSize = GetChunkSize((byte)readByte);
                         if (outPosition + chunkSize > bufferSize)
                         {
@@ -141,12 +133,11 @@ namespace SharpCompress.Compressors.ADC
                         outPosition += chunkSize;
                         position += chunkSize + 1;
                         break;
-                    case TwoByte:
-                        tempMs = new MemoryStream();
+                    case TWO_BYTE:
                         chunkSize = GetChunkSize((byte)readByte);
-                        tempMs.WriteByte((byte)readByte);
-                        tempMs.WriteByte((byte)input.ReadByte());
-                        offset = GetOffset(tempMs.ToArray(), 0);
+                        temp[0] = (byte)readByte;
+                        temp[1] = (byte)input.ReadByte();
+                        offset = GetOffset(temp);
                         if (outPosition + chunkSize > bufferSize)
                         {
                             full = true;
@@ -172,13 +163,12 @@ namespace SharpCompress.Compressors.ADC
                             position += 2;
                         }
                         break;
-                    case ThreeByte:
-                        tempMs = new MemoryStream();
+                    case THREE_BYTE:
                         chunkSize = GetChunkSize((byte)readByte);
-                        tempMs.WriteByte((byte)readByte);
-                        tempMs.WriteByte((byte)input.ReadByte());
-                        tempMs.WriteByte((byte)input.ReadByte());
-                        offset = GetOffset(tempMs.ToArray(), 0);
+                        temp[0] = (byte)readByte;
+                        temp[1] = (byte)input.ReadByte();
+                        temp[2] = (byte)input.ReadByte();
+                        offset = GetOffset(temp);
                         if (outPosition + chunkSize > bufferSize)
                         {
                             full = true;
@@ -213,7 +203,7 @@ namespace SharpCompress.Compressors.ADC
             }
 
             output = new byte[outPosition];
-            Array.Copy(buffer, 0, output, 0, outPosition);
+            Array.Copy(buffer, output, outPosition);
             return position - start;
         }
     }

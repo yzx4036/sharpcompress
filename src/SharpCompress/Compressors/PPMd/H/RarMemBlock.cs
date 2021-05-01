@@ -1,17 +1,18 @@
-using SharpCompress.Converters;
+using System;
+using System.Buffers.Binary;
 
 namespace SharpCompress.Compressors.PPMd.H
 {
     internal class RarMemBlock : Pointer
     {
-        public const int size = 12;
+        public const int SIZE = 12;
 
-        private int stamp, NU;
+        private int _stamp, _nu;
 
-        private int next, prev; // Pointer RarMemBlock
+        private int _next, _prev; // Pointer RarMemBlock
 
-        public RarMemBlock(byte[] Memory)
-            : base(Memory)
+        public RarMemBlock(byte[] memory)
+            : base(memory)
         {
         }
 
@@ -21,17 +22,17 @@ namespace SharpCompress.Compressors.PPMd.H
             {
                 if (Memory != null)
                 {
-                    stamp = DataConverter.LittleEndian.GetInt16(Memory, Address) & 0xffff;
+                    _stamp = BinaryPrimitives.ReadInt16LittleEndian(Memory.AsSpan(Address)) & 0xffff;
                 }
-                return stamp;
+                return _stamp;
             }
 
             set
             {
-                stamp = value;
+                _stamp = value;
                 if (Memory != null)
                 {
-                    DataConverter.LittleEndian.PutBytes(Memory, Address, (short)value);
+                    BinaryPrimitives.WriteInt16LittleEndian(Memory.AsSpan(Address), (short)value);
                 }
             }
         }
@@ -63,9 +64,9 @@ namespace SharpCompress.Compressors.PPMd.H
         {
             if (Memory != null)
             {
-                next = DataConverter.LittleEndian.GetInt32(Memory, Address + 4);
+                _next = BinaryPrimitives.ReadInt32LittleEndian(Memory.AsSpan(Address + 4));
             }
-            return next;
+            return _next;
         }
 
         internal void SetNext(RarMemBlock next)
@@ -75,28 +76,28 @@ namespace SharpCompress.Compressors.PPMd.H
 
         internal void SetNext(int next)
         {
-            this.next = next;
+            _next = next;
             if (Memory != null)
             {
-                DataConverter.LittleEndian.PutBytes(Memory, Address + 4, next);
+                BinaryPrimitives.WriteInt32LittleEndian(Memory.AsSpan(Address + 4), next);
             }
         }
 
-        internal int GetNU()
+        internal int GetNu()
         {
             if (Memory != null)
             {
-                NU = DataConverter.LittleEndian.GetInt16(Memory, Address + 2) & 0xffff;
+                _nu = BinaryPrimitives.ReadInt16LittleEndian(Memory.AsSpan(Address + 2)) & 0xffff;
             }
-            return NU;
+            return _nu;
         }
 
-        internal void SetNU(int nu)
+        internal void SetNu(int nu)
         {
-            NU = nu & 0xffff;
+            _nu = nu & 0xffff;
             if (Memory != null)
             {
-                DataConverter.LittleEndian.PutBytes(Memory, Address + 2, (short)nu);
+                BinaryPrimitives.WriteInt16LittleEndian(Memory.AsSpan(Address + 2), (short)nu);
             }
         }
 
@@ -104,9 +105,9 @@ namespace SharpCompress.Compressors.PPMd.H
         {
             if (Memory != null)
             {
-                prev = DataConverter.LittleEndian.GetInt32(Memory, Address + 8);
+                _prev = BinaryPrimitives.ReadInt32LittleEndian(Memory.AsSpan(Address + 8));
             }
-            return prev;
+            return _prev;
         }
 
         internal void SetPrev(RarMemBlock prev)
@@ -116,10 +117,10 @@ namespace SharpCompress.Compressors.PPMd.H
 
         internal void SetPrev(int prev)
         {
-            this.prev = prev;
+            _prev = prev;
             if (Memory != null)
             {
-                DataConverter.LittleEndian.PutBytes(Memory, Address + 8, prev);
+                BinaryPrimitives.WriteInt32LittleEndian(Memory.AsSpan(Address + 8), prev);
             }
         }
     }

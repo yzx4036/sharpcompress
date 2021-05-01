@@ -1,7 +1,6 @@
 ﻿using System.IO;
 using SharpCompress.Common;
 using SharpCompress.IO;
-using SharpCompress.Readers;
 
 namespace SharpCompress.Archives
 {
@@ -9,22 +8,17 @@ namespace SharpCompress.Archives
     {
         public static void WriteTo(this IArchiveEntry archiveEntry, Stream streamToWriteTo)
         {
-            if (archiveEntry.Archive.Type == ArchiveType.Rar && archiveEntry.Archive.IsSolid)
-            {
-                throw new InvalidFormatException("Cannot use Archive random access on SOLID Rar files.");
-            }
-
             if (archiveEntry.IsDirectory)
             {
                 throw new ExtractionException("Entry is a file directory and cannot be extracted.");
             }
 
-            var streamListener = archiveEntry.Archive as IArchiveExtractionListener;
+            var streamListener = (IArchiveExtractionListener)archiveEntry.Archive;
             streamListener.EnsureEntriesLoaded();
             streamListener.FireEntryExtractionBegin(archiveEntry);
             streamListener.FireFilePartExtractionBegin(archiveEntry.Key, archiveEntry.Size, archiveEntry.CompressedSize);
             var entryStream = archiveEntry.OpenEntryStream();
-            if (entryStream == null)
+            if (entryStream is null)
             {
                 return;
             }
@@ -38,67 +32,32 @@ namespace SharpCompress.Archives
             streamListener.FireEntryExtractionEnd(archiveEntry);
         }
 
-#if !NO_FILE
-
-/// <summary>
-/// Extract to specific directory, retaining filename
-/// </summary>
+        /// <summary>
+        /// Extract to specific directory, retaining filename
+        /// </summary>
         public static void WriteToDirectory(this IArchiveEntry entry, string destinationDirectory,
-                                            ExtractionOptions options = null)
+                                            ExtractionOptions? options = null)
         {
-            string destinationFileName;
-            string file = Path.GetFileName(entry.Key);
-
-            options = options ?? new ExtractionOptions()
-                                 {
-                                     Overwrite = true
-                                 };
-
-
-            if (options.ExtractFullPath)
-            {
-                string folder = Path.GetDirectoryName(entry.Key);
-                string destdir = Path.Combine(destinationDirectory, folder);
-                if (!Directory.Exists(destdir))
-                {
-                    Directory.CreateDirectory(destdir);
-                }
-                destinationFileName = Path.Combine(destdir, file);
-            }
-            else
-            {
-                destinationFileName = Path.Combine(destinationDirectory, file);
-            }
-            if (!entry.IsDirectory)
-            {
-                entry.WriteToFile(destinationFileName, options);
-            }
+            ExtractionMethods.WriteEntryToDirectory(entry, destinationDirectory, options,
+                                              entry.WriteToFile);
         }
 
         /// <summary>
         /// Extract to specific file
         /// </summary>
-        public static void WriteToFile(this IArchiveEntry entry, string destinationFileName,
-                                       ExtractionOptions options = null)
+        public static void WriteToFile(this IArchiveEntry entry,
+                                       string destinationFileName,
+                                       ExtractionOptions? options = null)
         {
-            FileMode fm = FileMode.Create;
-            options = options ?? new ExtractionOptions()
-            {
-                Overwrite = true
-            };
 
-
-            if (!options.Overwrite)
-            {
-                fm = FileMode.CreateNew;
-            }
-            using (FileStream fs = File.Open(destinationFileName, fm))
-            {
-                entry.WriteTo(fs);
-            }
-
-            entry.PreserveExtractionOptions(destinationFileName, options);
+            ExtractionMethods.WriteEntryToFile(entry, destinationFileName, options,
+                                               (x, fm) =>
+                                               {
+                                                   using (FileStream fs = File.Open(destinationFileName, fm))
+                                                   {
+                                                       entry.WriteTo(fs);
+                                                   }
+                                               });
         }
-#endif
     }
 }

@@ -26,13 +26,13 @@ namespace SharpCompress.Readers
         /// <param name="stream"></param>
         /// <param name="options"></param>
         /// <returns></returns>
-        public static IReader Open(Stream stream, ReaderOptions options = null)
+        public static IReader Open(Stream stream, ReaderOptions? options = null)
         {
-            stream.CheckNotNull("stream");
+            stream.CheckNotNull(nameof(stream));
             options = options ?? new ReaderOptions()
-                                 {
-                                     LeaveStreamOpen = false
-                                 };
+            {
+                LeaveStreamOpen = false
+            };
             RewindableStream rewindableStream = new RewindableStream(stream);
             rewindableStream.StartRecording();
             if (ZipArchive.IsZipFile(rewindableStream, options.Password))
@@ -58,7 +58,7 @@ namespace SharpCompress.Readers
             if (BZip2Stream.IsBZip2(rewindableStream))
             {
                 rewindableStream.Rewind(false);
-                BZip2Stream testStream = new BZip2Stream(rewindableStream, CompressionMode.Decompress, true);
+                BZip2Stream testStream = new BZip2Stream(new NonDisposingStream(rewindableStream), CompressionMode.Decompress, false);
                 if (TarArchive.IsTarFile(testStream))
                 {
                     rewindableStream.Rewind(true);
@@ -70,7 +70,7 @@ namespace SharpCompress.Readers
             if (LZipStream.IsLZipFile(rewindableStream))
             {
                 rewindableStream.Rewind(false);
-                LZipStream testStream = new LZipStream(rewindableStream, CompressionMode.Decompress, true);
+                LZipStream testStream = new LZipStream(new NonDisposingStream(rewindableStream), CompressionMode.Decompress);
                 if (TarArchive.IsTarFile(testStream))
                 {
                     rewindableStream.Rewind(true);

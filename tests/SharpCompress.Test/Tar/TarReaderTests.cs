@@ -3,6 +3,7 @@ using System.IO;
 using SharpCompress.Common;
 using SharpCompress.Readers;
 using SharpCompress.Readers.Tar;
+using SharpCompress.Test.Mocks;
 using Xunit;
 
 namespace SharpCompress.Test.Tar
@@ -26,7 +27,6 @@ namespace SharpCompress.Test.Tar
             using (Stream stream = new ForwardOnlyStream(File.OpenRead(Path.Combine(TEST_ARCHIVES_PATH, "Tar.tar"))))
             using (IReader reader = ReaderFactory.Open(stream))
             {
-                ResetScratch();
                 int x = 0;
                 while (reader.MoveToNextEntry())
                 {
@@ -74,7 +74,6 @@ namespace SharpCompress.Test.Tar
         [Fact]
         public void Tar_BZip2_Entry_Stream()
         {
-            ResetScratch();
             using (Stream stream = File.OpenRead(Path.Combine(TEST_ARCHIVES_PATH, "Tar.tar.bz2")))
             using (var reader = TarReader.Open(stream))
             {
@@ -119,7 +118,7 @@ namespace SharpCompress.Test.Tar
                     {
                         filePaths.Add(reader.Entry.Key);
                     }
-                }                
+                }
             }
 
             Assert.Equal(3, filePaths.Count);
@@ -161,5 +160,97 @@ namespace SharpCompress.Test.Tar
                 Assert.True(reader.ArchiveType == ArchiveType.Tar);
             }
         }
+
+        [Fact]
+        public void Tar_With_TarGz_With_Flushed_EntryStream()
+        {
+            string archiveFullPath = Path.Combine(TEST_ARCHIVES_PATH, "Tar.ContainsTarGz.tar");
+            using (Stream stream = File.OpenRead(archiveFullPath))
+            using (IReader reader = ReaderFactory.Open(stream))
+            {
+                Assert.True(reader.MoveToNextEntry());
+                Assert.Equal("inner.tar.gz", reader.Entry.Key);
+
+                using (var entryStream = reader.OpenEntryStream())
+                {
+
+                    using (FlushOnDisposeStream flushingStream = new FlushOnDisposeStream(entryStream))
+                    {
+
+                        // Extract inner.tar.gz
+                        using (var innerReader = ReaderFactory.Open(flushingStream))
+                        {
+
+                            Assert.True(innerReader.MoveToNextEntry());
+                            Assert.Equal("test", innerReader.Entry.Key);
+
+                        }
+                    }
+                }
+            }
+        }
+
+#if !NET461
+        [Fact]
+        public void Tar_GZip_With_Symlink_Entries()
+        {
+            var isWindows = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                System.Runtime.InteropServices.OSPlatform.Windows);
+            using (Stream stream = File.OpenRead(Path.Combine(TEST_ARCHIVES_PATH, "TarWithSymlink.tar.gz")))
+            using (var reader = TarReader.Open(stream))
+            {
+                List<string> names = new List<string>();
+                while (reader.MoveToNextEntry())
+                {
+                    if (reader.Entry.IsDirectory)
+                    {
+                        continue;
+                    }
+                    reader.WriteEntryToDirectory(SCRATCH_FILES_PATH,
+                                                 new ExtractionOptions()
+                                                 {
+                                                     ExtractFullPath = true,
+                                                     Overwrite = true,
+                                                     WriteSymbolicLink = (sourcePath, targetPath) =>
+                                                     {
+                                                         if (!isWindows)
+                                                         {
+                                                             var link = new Mono.Unix.UnixSymbolicLinkInfo(sourcePath);
+                                                             if (File.Exists(sourcePath))
+                                                             {
+                                                                 link.Delete(); // equivalent to ln -s -f
+                                                             }
+                                                             link.CreateSymbolicLinkTo(targetPath);
+                                                         }
+                                                     }
+                                                 });
+                    if (!isWindows)
+                    {
+                        if (reader.Entry.LinkTarget != null)
+                        {
+                            var path = System.IO.Path.Combine(SCRATCH_FILES_PATH, reader.Entry.Key);
+                            var link = new Mono.Unix.UnixSymbolicLinkInfo(path);
+                            if (link.HasContents)
+                            {
+                                // need to convert the link to an absolute path for comparison
+                                var target = reader.Entry.LinkTarget;
+                                var realTarget = System.IO.Path.GetFullPath(
+                                    System.IO.Path.Combine($"{System.IO.Path.GetDirectoryName(path)}",
+                                    target)
+                                );
+
+                                Assert.Equal(realTarget, link.GetContents().ToString());
+                            }
+                            else
+                            {
+                                Assert.True(false, "Symlink has no target");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+#endif
+
     }
 }

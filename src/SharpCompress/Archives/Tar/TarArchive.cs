@@ -15,16 +15,14 @@ namespace SharpCompress.Archives.Tar
 {
     public class TarArchive : AbstractWritableArchive<TarArchiveEntry, TarVolume>
     {
-#if !NO_FILE
-
         /// <summary>
         /// Constructor expects a filepath to an existing file.
         /// </summary>
         /// <param name="filePath"></param>
         /// <param name="readerOptions"></param>
-        public static TarArchive Open(string filePath, ReaderOptions readerOptions = null)
+        public static TarArchive Open(string filePath, ReaderOptions? readerOptions = null)
         {
-            filePath.CheckNotNullOrEmpty("filePath");
+            filePath.CheckNotNullOrEmpty(nameof(filePath));
             return Open(new FileInfo(filePath), readerOptions ?? new ReaderOptions());
         }
 
@@ -33,25 +31,22 @@ namespace SharpCompress.Archives.Tar
         /// </summary>
         /// <param name="fileInfo"></param>
         /// <param name="readerOptions"></param>
-        public static TarArchive Open(FileInfo fileInfo, ReaderOptions readerOptions = null)
+        public static TarArchive Open(FileInfo fileInfo, ReaderOptions? readerOptions = null)
         {
-            fileInfo.CheckNotNull("fileInfo");
+            fileInfo.CheckNotNull(nameof(fileInfo));
             return new TarArchive(fileInfo, readerOptions ?? new ReaderOptions());
         }
-#endif
 
         /// <summary>
         /// Takes a seekable Stream as a source
         /// </summary>
         /// <param name="stream"></param>
         /// <param name="readerOptions"></param>
-        public static TarArchive Open(Stream stream, ReaderOptions readerOptions = null)
+        public static TarArchive Open(Stream stream, ReaderOptions? readerOptions = null)
         {
-            stream.CheckNotNull("stream");
+            stream.CheckNotNull(nameof(stream));
             return new TarArchive(stream, readerOptions ?? new ReaderOptions());
         }
-
-#if !NO_FILE
 
         public static bool IsTarFile(string filePath)
         {
@@ -69,23 +64,21 @@ namespace SharpCompress.Archives.Tar
                 return IsTarFile(stream);
             }
         }
-#endif
 
         public static bool IsTarFile(Stream stream)
         {
             try
             {
-                TarHeader tar = new TarHeader(new ArchiveEncoding());
-                tar.Read(new BinaryReader(stream));
-                return tar.Name.Length > 0 && Enum.IsDefined(typeof(EntryType), tar.EntryType);
+                TarHeader tarHeader = new TarHeader(new ArchiveEncoding());
+                bool readSucceeded = tarHeader.Read(new BinaryReader(stream));
+                bool isEmptyArchive = tarHeader.Name.Length == 0 && tarHeader.Size == 0 && Enum.IsDefined(typeof(EntryType), tarHeader.EntryType);
+                return readSucceeded || isEmptyArchive;
             }
             catch
             {
             }
             return false;
         }
-
-#if !NO_FILE
 
         /// <summary>
         /// Constructor with a FileInfo object to an existing file.
@@ -101,7 +94,6 @@ namespace SharpCompress.Archives.Tar
         {
             return new TarVolume(file.OpenRead(), ReaderOptions).AsEnumerable();
         }
-#endif
 
         /// <summary>
         /// Takes multiple seekable Streams for a multi-part archive
@@ -126,8 +118,8 @@ namespace SharpCompress.Archives.Tar
         protected override IEnumerable<TarArchiveEntry> LoadEntries(IEnumerable<TarVolume> volumes)
         {
             Stream stream = volumes.Single().Stream;
-            TarHeader previousHeader = null;
-            foreach (TarHeader header in TarHeaderFactory.ReadHeader(StreamingMode.Seekable, stream, ReaderOptions.ArchiveEncoding))
+            TarHeader? previousHeader = null;
+            foreach (TarHeader? header in TarHeaderFactory.ReadHeader(StreamingMode.Seekable, stream, ReaderOptions.ArchiveEncoding))
             {
                 if (header != null)
                 {
@@ -182,7 +174,7 @@ namespace SharpCompress.Archives.Tar
                                        IEnumerable<TarArchiveEntry> oldEntries,
                                        IEnumerable<TarArchiveEntry> newEntries)
         {
-            using (var writer = new TarWriter(stream, options))
+            using (var writer = new TarWriter(stream, new TarWriterOptions(options)))
             {
                 foreach (var entry in oldEntries.Concat(newEntries)
                                                 .Where(x => !x.IsDirectory))

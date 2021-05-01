@@ -14,3 +14,7 @@ tests/TestArchives/Scratch
 .vs
 tools
 .vscode
+.idea/
+
+.DS_Store
+*.snupkg

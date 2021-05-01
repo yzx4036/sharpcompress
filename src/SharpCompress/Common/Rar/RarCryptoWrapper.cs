@@ -1,23 +1,21 @@
-
-#if !NO_CRYPTO
 using System;
 using System.Collections.Generic;
 using System.IO;
 
 namespace SharpCompress.Common.Rar
 {
-    internal class RarCryptoWrapper : Stream
+    internal sealed class RarCryptoWrapper : Stream
     {
-        private readonly Stream actualStream;
-        private readonly byte[] salt;
-        private RarRijndael rijndael;
-        private readonly Queue<byte> data = new Queue<byte>();
+        private readonly Stream _actualStream;
+        private readonly byte[] _salt;
+        private RarRijndael _rijndael;
+        private readonly Queue<byte> _data = new Queue<byte>();
 
         public RarCryptoWrapper(Stream actualStream, string password, byte[] salt)
         {
-            this.actualStream = actualStream;
-            this.salt = salt;
-            rijndael = RarRijndael.InitializeFrom(password, salt);
+            _actualStream = actualStream;
+            _salt = salt;
+            _rijndael = RarRijndael.InitializeFrom(password, salt);
         }
 
         public override void Flush()
@@ -37,35 +35,38 @@ namespace SharpCompress.Common.Rar
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            if (salt == null)
+            if (_salt is null)
             {
-                return actualStream.Read(buffer, offset, count);
+                return _actualStream.Read(buffer, offset, count);
             }
             return ReadAndDecrypt(buffer, offset, count);
         }
 
         public int ReadAndDecrypt(byte[] buffer, int offset, int count)
         {
-            int queueSize = data.Count;
+            int queueSize = _data.Count;
             int sizeToRead = count - queueSize;
 
             if (sizeToRead > 0)
             {
                 int alignedSize = sizeToRead + ((~sizeToRead + 1) & 0xf);
+                Span<byte> cipherText = stackalloc byte[RarRijndael.CRYPTO_BLOCK_SIZE];
                 for (int i = 0; i < alignedSize / 16; i++)
                 {
                     //long ax = System.currentTimeMillis();
-                    byte[] cipherText = new byte[RarRijndael.CRYPTO_BLOCK_SIZE];
-                    actualStream.Read(cipherText, 0, RarRijndael.CRYPTO_BLOCK_SIZE);
+                    _actualStream.Read(cipherText);
 
-                    var readBytes = rijndael.ProcessBlock(cipherText);
+                    var readBytes = _rijndael.ProcessBlock(cipherText);
                     foreach (var readByte in readBytes)
-                        data.Enqueue(readByte);
-
+                    {
+                        _data.Enqueue(readByte);
+                    }
                 }
 
                 for (int i = 0; i < count; i++)
-                    buffer[offset + i] = data.Dequeue();
+                {
+                    buffer[offset + i] = _data.Dequeue();
+                }
             }
             return count;
         }
@@ -75,37 +76,24 @@ namespace SharpCompress.Common.Rar
             throw new NotSupportedException();
         }
 
-        public override bool CanRead
-        {
-            get { return true; }
-        }
+        public override bool CanRead => true;
 
-        public override bool CanSeek
-        {
-            get { return false; }
-        }
+        public override bool CanSeek => false;
 
-        public override bool CanWrite
-        {
-            get { return false; }
-        }
+        public override bool CanWrite => false;
 
-        public override long Length
-        {
-            get { throw new NotSupportedException(); }
-        }
+        public override long Length => throw new NotSupportedException();
 
         public override long Position { get; set; }
 
         protected override void Dispose(bool disposing)
         {
-            if (rijndael != null)
+            if (_rijndael != null)
             {
-                rijndael.Dispose();
-                rijndael = null;
+                _rijndael.Dispose();
+                _rijndael = null!;
             }
             base.Dispose(disposing);
         }
     }
 }
-#endif

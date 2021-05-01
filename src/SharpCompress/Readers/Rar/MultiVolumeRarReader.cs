@@ -1,4 +1,6 @@
-﻿using System.Collections;
+﻿#nullable disable
+
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -22,7 +24,7 @@ namespace SharpCompress.Readers.Rar
         {
         }
 
-        internal override Stream RequestInitialStream()
+        protected override Stream RequestInitialStream()
         {
             if (streams.MoveNext())
             {
@@ -35,12 +37,8 @@ namespace SharpCompress.Readers.Rar
         {
             if (!base.NextEntryForCurrentStream())
             {
-                //if we're got another stream to try to process then do so
-                if (streams.MoveNext() && LoadStreamForReading(streams.Current))
-                {
-                    return true;
-                }
-                return false;
+                // if we're got another stream to try to process then do so
+                return streams.MoveNext() && LoadStreamForReading(streams.Current);
             }
             return true;
         }
@@ -94,7 +92,7 @@ namespace SharpCompress.Readers.Rar
                     return true;
                 }
 
-                if (!reader.Entry.IsSplit)
+                if (!reader.Entry.IsSplitAfter)
                 {
                     return false;
                 }
